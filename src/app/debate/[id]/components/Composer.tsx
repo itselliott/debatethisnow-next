@@ -5,6 +5,7 @@ import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
 import { useSocket } from "@/lib/hooks/use-socket";
 import { countWords } from "@/lib/utils/word-count";
+import { useTone } from "@/lib/hooks/use-tone";
 
 const MIN_WORDS = 15;
 const TYPING_DEBOUNCE_MS = 800;
@@ -20,6 +21,7 @@ export function Composer({
   const state = useStore(store, (s) => s.state);
   const debateId = useStore(store, (s) => s.debateId);
   const socket = useSocket();
+  const { t } = useTone();
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function Composer({
     <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
       <div className="mb-2 flex items-center justify-between font-condensed text-xs uppercase tracking-wider">
         <span className={isMyTurn ? "text-red" : "text-sepia"}>
-          {isMyTurn ? "🎤 Your Turn" : "Waiting for your turn"}
+          {isMyTurn ? t("header_your_turn") : t("header_waiting")}
         </span>
         <span className="text-sepia">{wc} words</span>
       </div>
@@ -98,9 +100,7 @@ export function Composer({
         onChange={(e) => setText(e.target.value)}
         disabled={!isMyTurn}
         placeholder={
-          isMyTurn
-            ? "Build your argument. Cite. Conclude."
-            : "Wait for your turn to compose."
+          isMyTurn ? t("composer_placeholder") : "Wait for your turn to write."
         }
         rows={6}
         className="w-full resize-y rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm focus:outline-none focus:ring-2 focus:ring-red disabled:opacity-50"
@@ -120,7 +120,7 @@ export function Composer({
           onClick={submit}
           className="rounded bg-red px-4 py-2 font-condensed text-sm uppercase tracking-widest text-paper shadow-press hover:translate-x-px hover:translate-y-px hover:shadow-press-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Submitting…" : "Submit Argument ▸"}
+          {submitting ? "Submitting…" : t("composer_submit")}
         </button>
       </div>
     </section>

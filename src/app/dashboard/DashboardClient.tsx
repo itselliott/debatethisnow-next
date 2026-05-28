@@ -13,6 +13,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DebateDict } from "@/lib/serializers/debate";
+import { useTone } from "@/lib/hooks/use-tone";
 
 interface DashboardClientProps {
   userId: number;
@@ -20,6 +21,7 @@ interface DashboardClientProps {
 }
 
 export function DashboardClient({ userId, username }: DashboardClientProps) {
+  const { t } = useTone();
   useDashboardLiveRefresh();
   const myActive = useMyActiveDebates();
   const active = useActiveDebates();
@@ -44,33 +46,33 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
 
       <CtaTiles />
 
-      <Panel title="Active Debates">
+      <Panel title={t("live_debates_title")}>
         {active.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
         ) : (active.data?.debates ?? []).length === 0 ? (
           <p className="text-sm text-sepia">
-            No active debates. Be the first to start one.
+            Nothing live right now. Be the first to start something.
           </p>
         ) : (
           <DebateGrid debates={active.data!.debates} viewerId={userId} />
         )}
       </Panel>
 
-      <Panel title="Trending Topics">
+      <Panel title={t("trending_title")}>
         {trending.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
-            {(trending.data?.topics ?? []).map((t) => (
-              <li key={t.topic}>
+            {(trending.data?.topics ?? []).map((topic) => (
+              <li key={topic.topic}>
                 <Link
-                  href={`/matchmaking?topic=${encodeURIComponent(t.topic)}&category=${encodeURIComponent(t.category)}`}
+                  href={`/matchmaking?topic=${encodeURIComponent(topic.topic)}&category=${encodeURIComponent(topic.category)}`}
                   className="block rounded border border-ink bg-paper-2 p-3 text-sm shadow-press-sm transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
                 >
                   <span className="font-condensed text-xs uppercase tracking-wider text-red">
-                    {t.category}
+                    {topic.category}
                   </span>
-                  <div className="mt-1 font-body text-ink">{t.topic}</div>
+                  <div className="mt-1 font-body text-ink">{topic.topic}</div>
                 </Link>
               </li>
             ))}
@@ -78,7 +80,7 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
         )}
       </Panel>
 
-      <Panel title="Past Debates">
+      <Panel title={t("past_debates_title")}>
         {myPast.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
         ) : (myPast.data?.debates ?? []).length === 0 ? (
@@ -235,6 +237,7 @@ function ChallengesCard({
 }
 
 function CtaTiles() {
+  const { t } = useTone();
   return (
     <section className="grid gap-4 sm:grid-cols-3">
       <Link
@@ -244,10 +247,8 @@ function CtaTiles() {
         <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
           Start
         </div>
-        <h3 className="mt-1 font-display text-xl">Start New Debate</h3>
-        <p className="mt-2 text-sm text-sepia">
-          Pick a topic, queue for a worthy opponent.
-        </p>
+        <h3 className="mt-1 font-display text-xl">{t("cta_start")}</h3>
+        <p className="mt-2 text-sm text-sepia">{t("cta_start_sub")}</p>
       </Link>
       <Link
         href="/matchmaking?random=1"
@@ -256,10 +257,8 @@ function CtaTiles() {
         <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
           Random
         </div>
-        <h3 className="mt-1 font-display text-xl">Join Random</h3>
-        <p className="mt-2 text-sm text-sepia">
-          Skip choosing — fight on whatever comes up.
-        </p>
+        <h3 className="mt-1 font-display text-xl">{t("cta_random")}</h3>
+        <p className="mt-2 text-sm text-sepia">{t("cta_random_sub")}</p>
       </Link>
       <Link
         href="/bots"
@@ -268,10 +267,8 @@ function CtaTiles() {
         <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
           Showcase
         </div>
-        <h3 className="mt-1 font-display text-xl">Watch Bots Debate</h3>
-        <p className="mt-2 text-sm text-sepia">
-          Stage a bot-vs-bot match and watch live.
-        </p>
+        <h3 className="mt-1 font-display text-xl">{t("cta_showcase")}</h3>
+        <p className="mt-2 text-sm text-sepia">{t("cta_showcase_sub")}</p>
       </Link>
     </section>
   );

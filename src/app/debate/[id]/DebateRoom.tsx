@@ -196,7 +196,11 @@ export function DebateRoom({
       {status === "live" && !isPrep ? (
         <Composer store={store} viewerId={viewerId} />
       ) : null}
-      {(status === "voting" || status === "completed") && !isShowcase ? (
+      {/* Voting works in BOTH human-vs-human AND bot-vs-bot showcase
+          debates — the showcase flow flips status to "voting" via the
+          spectator-driven "Open Voting" button. Previous version excluded
+          showcases here, which made bot-vs-bot voting silently broken. */}
+      {(status === "voting" || status === "completed") ? (
         <VotePanel store={store} viewerId={viewerId} />
       ) : null}
       {isShowcase ? <ShowcasePanel store={store} viewerId={viewerId} /> : null}

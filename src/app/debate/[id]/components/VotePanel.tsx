@@ -3,6 +3,7 @@
 import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
 import { useSocket } from "@/lib/hooks/use-socket";
+import { useTone } from "@/lib/hooks/use-tone";
 
 export function VotePanel({
   store,
@@ -11,6 +12,7 @@ export function VotePanel({
   store: DebateStore;
   viewerId: number;
 }) {
+  const { t } = useTone();
   const state = useStore(store, (s) => s.state);
   const myVoteFor = useStore(store, (s) => s.myVoteFor);
   const socket = useSocket();
@@ -30,12 +32,12 @@ export function VotePanel({
     <section className="rounded border-2 border-red bg-paper-2 p-4 shadow-press">
       <h2 className="font-display text-xl">
         {state.status === "voting"
-          ? "Audience Vote — pick the stronger case"
-          : "Live Audience Vote — who's winning right now?"}
+          ? t("vote_title_final")
+          : t("vote_title_live")}
       </h2>
       {myVoteFor ? (
         <p className="mt-2 text-sm text-sepia">
-          You voted for{" "}
+          {t("vote_receipt")}{" "}
           <strong className="text-ink">
             {myVoteFor === state.player1?.id
               ? state.player1?.username

@@ -4,6 +4,7 @@ import { useStore } from "zustand";
 import { useRouter } from "next/navigation";
 import { formatMMSS, type DebateStore } from "@/lib/stores/debate-store";
 import { apiClient } from "@/lib/api-client";
+import { useTone } from "@/lib/hooks/use-tone";
 
 export function DebateHeader({
   store,
@@ -13,6 +14,7 @@ export function DebateHeader({
   viewerId: number;
 }) {
   const router = useRouter();
+  const { t } = useTone();
   const state = useStore(store, (s) => s.state);
   const secondsRemaining = useStore(store, (s) => s.secondsRemaining);
   const isShowcase = Boolean(state?.is_showcase);
@@ -28,7 +30,7 @@ export function DebateHeader({
       <div>
         <div className="flex items-center gap-3">
           <span className="rounded bg-red px-3 py-1 font-condensed text-xs uppercase tracking-widest text-paper">
-            Round {round} / 3
+            {t("round_label")} {round} / 3
           </span>
           <span className="font-condensed text-xs uppercase tracking-wider text-sepia">
             {state?.phase ?? "—"}
@@ -64,11 +66,7 @@ export function DebateHeader({
           <button
             type="button"
             onClick={async () => {
-              if (
-                !window.confirm(
-                  "Forfeit this debate? Your opponent wins automatically.",
-                )
-              ) {
+              if (!window.confirm(t("forfeit_confirm"))) {
                 return;
               }
               try {
@@ -80,7 +78,7 @@ export function DebateHeader({
             }}
             className="rounded border-2 border-red bg-paper-2 px-3 py-2 font-condensed text-xs uppercase tracking-wider text-red shadow-press-sm hover:bg-red hover:text-paper"
           >
-            Forfeit
+            {t("forfeit_button")}
           </button>
         ) : null}
       </div>

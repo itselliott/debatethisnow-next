@@ -4,17 +4,17 @@
  * Sidebar — fixed 240px column with the brand mark, primary nav, and the
  * user-mini footer. Mirrors `app/templates/base.html`'s left rail.
  *
- * State that has to live client-side:
- *   - sidebar collapse (persisted in localStorage `debatethis.sidebarCollapsed`)
- *   - active route highlight (driven by `usePathname`)
- *
- * Notifications bell, sound toggle, and logout button are stubbed here;
- * full behavior lands in Phase 5 (notifications) and is already wired
- * server-side via /api/auth/logout.
+ * Mobile (below md): hidden entirely; primary nav lives in the
+ * MobileBottomNav component. Desktop: 240px column, collapsible via the
+ * chevron inside its header. When collapsed, a floating menu icon
+ * appears top-left to expand. The toggle is NEVER positioned over the
+ * main content area — caught + fixed by user testing.
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useSoundToggle } from "@/lib/hooks/use-sound";
 
 const SIDEBAR_KEY = "debatethis.sidebarCollapsed";
 
@@ -46,8 +46,6 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate the persisted collapse state after mount so SSR + client agree
-  // on initial render (avoids a hydration mismatch).
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(SIDEBAR_KEY);
@@ -58,8 +56,6 @@ export function Sidebar() {
     setHydrated(true);
   }, []);
 
-  // Propagate to the app-shell grid via a data attribute. Tailwind's
-  // `data-[collapsed=true]:grid-cols-[0_1fr]` in layout.tsx reads this.
   useEffect(() => {
     if (!hydrated) return;
     const shell = document.querySelector(".app-shell");
@@ -82,39 +78,55 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Hamburger — fixed top-left when sidebar is collapsed. Hidden on
-          mobile (the bottom-nav handles primary navigation below md). */}
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
-        className={`fixed top-3 z-50 hidden h-10 w-10 items-center justify-center rounded bg-navy text-paper shadow-press-sm transition-[left] md:flex ${
-          collapsed ? "left-3" : "left-[252px]"
-        }`}
-      >
-        <span aria-hidden className="text-xl leading-none">
-          ☰
-        </span>
-      </button>
+      {/* Floating expand button — only when sidebar is collapsed. Hidden
+          on mobile (bottom-nav handles primary nav). NEVER positioned over
+          main content; when sidebar is open, this button doesn't render. */}
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label="Open sidebar"
+          className="fixed left-3 top-3 z-50 hidden h-10 w-10 items-center justify-center rounded bg-navy text-paper shadow-press-sm md:flex"
+        >
+          <span aria-hidden className="text-xl leading-none">
+            ☰
+          </span>
+        </button>
+      ) : null}
 
       <aside
         id="app-sidebar"
         aria-label="Primary"
-        className={`sidebar sticky top-0 z-20 hidden h-screen flex-col gap-6 border-r-4 border-ink bg-navy px-4 py-5 text-paper transition-transform md:flex ${
-          collapsed ? "-translate-x-full" : "translate-x-0"
+        className={`sidebar sticky top-0 z-20 hidden h-screen flex-col gap-6 border-r-4 border-ink bg-navy px-4 py-5 text-paper md:flex ${
+          collapsed ? "md:hidden" : ""
         }`}
         style={{ boxShadow: "4px 0 0 var(--color-gold)" }}
       >
-        <div className="flex flex-col items-start gap-1">
-          <Link href="/" className="block font-display text-3xl tracking-tight">
+        {/* Header: brand + collapse chevron inside the sidebar so it never
+            overlaps main content. */}
+        <div className="flex items-start justify-between gap-2">
+          <Link
+            href="/"
+            className="block font-display text-3xl leading-none tracking-tight"
+          >
             DEBATE
             <br />
             THIS
           </Link>
-          <span className="font-condensed text-xs uppercase tracking-[0.28em] text-paper-3">
-            The Arena
-          </span>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label="Collapse sidebar"
+            className="rounded p-1 text-paper-3 transition-colors hover:bg-ink-soft hover:text-paper"
+          >
+            <span aria-hidden className="text-lg leading-none">
+              ‹
+            </span>
+          </button>
         </div>
+        <span className="-mt-4 font-condensed text-xs uppercase tracking-[0.28em] text-paper-3">
+          The Arena
+        </span>
 
         <nav className="flex flex-1 flex-col gap-1">
           {NAV_LINKS.map((link) => (
@@ -122,6 +134,7 @@ export function Sidebar() {
               key={link.href}
               href={link.href}
               data-route={link.href}
+              aria-current={isActive(pathname, link.href) ? "page" : undefined}
               className={`nav-item rounded px-3 py-2 font-condensed text-sm uppercase tracking-wider transition-colors hover:bg-ink-soft ${
                 isActive(pathname, link.href)
                   ? "bg-ink-soft text-gold"
@@ -140,47 +153,30 @@ export function Sidebar() {
 }
 
 function SidebarFooter() {
-  // Live user-mini, notifications bell, and logout. Phase 1 just sketches
-  // the slots; full TanStack Query wiring lands in Phase 5.
+  const me = useCurrentUser();
   return (
     <div className="flex flex-col gap-3 border-t border-ink-soft pt-3 text-sm">
-      <div
-        id="notifications-widget"
-        className="flex items-center justify-between"
-      >
+      <div className="flex items-center justify-between">
         <button
-          id="notif-bell"
           type="button"
           aria-label="Notifications"
           className="relative font-condensed text-xs uppercase tracking-wider text-paper hover:text-gold"
         >
-          🔔 Notifications
-          <span
-            id="notif-bell-badge"
-            hidden
-            className="absolute -right-3 -top-1 rounded-full bg-red px-1.5 py-0.5 text-[10px] text-paper"
-          />
+          <span aria-hidden>🔔</span> Notifications
         </button>
       </div>
 
-      <div id="user-mini" className="flex flex-col gap-2">
-        <span
-          id="user-mini-name"
-          className="font-condensed uppercase tracking-wider text-paper-3"
-        >
-          —
+      <div className="flex flex-col gap-2">
+        <span className="truncate font-condensed uppercase tracking-wider text-paper-3">
+          {me.data?.username ?? "—"}
         </span>
-        <span id="user-mini-elo" className="text-xs text-paper-3">
-          —
+        <span className="text-xs text-paper-3">
+          {me.data
+            ? `Elo ${me.data.elo_rating} · ${me.data.rank_tier ?? ""}`
+            : "—"}
         </span>
         <div className="flex gap-2">
-          <button
-            id="sound-toggle"
-            type="button"
-            className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
-          >
-            ♪ SOUND ON
-          </button>
+          <SoundToggleButton />
           <LogoutButton />
         </div>
       </div>
@@ -197,11 +193,27 @@ function SidebarFooter() {
   );
 }
 
+function SoundToggleButton() {
+  const { muted, toggle } = useSoundToggle();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={!muted}
+      title={
+        muted
+          ? "Sound is off — click to turn on"
+          : "Sound is on — click to mute"
+      }
+      className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
+    >
+      <span aria-hidden>♪</span> {muted ? "Sound Off" : "Sound On"}
+    </button>
+  );
+}
+
 function LogoutButton() {
   const handleLogout = useCallback(async () => {
-    // Server clears cookies + revokes jti. CSRF header echo is enforced
-    // by every state-changing /api/* route — we read the JS-visible
-    // `dt_csrf_access` cookie and echo it.
     const csrf = document.cookie
       .split(";")
       .map((c) => c.trim())
@@ -211,7 +223,9 @@ function LogoutButton() {
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "same-origin",
-        headers: csrf ? { "X-CSRF-TOKEN": decodeURIComponent(csrf) } : undefined,
+        headers: csrf
+          ? { "X-CSRF-TOKEN": decodeURIComponent(csrf) }
+          : undefined,
       });
     } catch {
       /* network errors are fine — cookie clear will still take effect */
@@ -220,12 +234,11 @@ function LogoutButton() {
   }, []);
   return (
     <button
-      id="logout-btn"
       type="button"
       onClick={handleLogout}
       className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-red hover:text-paper"
     >
-      LOG OUT
+      Log Out
     </button>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient, ApiError } from "@/lib/api-client";
+import { useTone } from "@/lib/hooks/use-tone";
 
 const LANGUAGES = [
   { code: "en", label: "English", flag: "🇺🇸" },
@@ -80,6 +81,8 @@ export function SettingsClient({
         <p className="text-sm text-sepia">Signed in as {username}.</p>
       </header>
 
+      <ToneSection />
+
       <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
         <h2 className="font-display text-lg">Language</h2>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -129,5 +132,70 @@ export function SettingsClient({
         ) : null}
       </section>
     </div>
+  );
+}
+
+function ToneSection() {
+  const { tone, setTone } = useTone();
+  return (
+    <section className="rounded border-2 border-gold bg-paper-2 p-4 shadow-press">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg">Tone</h2>
+          <p className="mt-1 text-sm text-sepia">
+            How the site talks to you. <strong>Competitive</strong> uses
+            debate jargon — "Opening Statement", "Rebuttal", "Elo".{" "}
+            <strong>Casual</strong> drops the formalism — "Your Point",
+            "Push Back", "Score".
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <ToneOption
+          active={tone === "competitive"}
+          label="Competitive"
+          sub="Debate club energy"
+          onClick={() => setTone("competitive")}
+        />
+        <ToneOption
+          active={tone === "casual"}
+          label="Casual"
+          sub="Just argue with strangers"
+          onClick={() => setTone("casual")}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ToneOption({
+  active,
+  label,
+  sub,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex-1 rounded border-2 p-3 text-left transition-transform ${
+        active
+          ? "border-red bg-red text-paper shadow-press"
+          : "border-ink bg-paper text-ink shadow-press-sm hover:translate-x-px hover:translate-y-px hover:shadow-none"
+      }`}
+    >
+      <div className="font-display text-lg leading-none">{label}</div>
+      <div
+        className={`mt-1 text-xs ${active ? "text-paper-3" : "text-sepia"}`}
+      >
+        {sub}
+      </div>
+    </button>
   );
 }
