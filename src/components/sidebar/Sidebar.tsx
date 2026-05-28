@@ -82,13 +82,13 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Hamburger — fixed top-left when sidebar is collapsed.
-          Mirrors main.css's `.sidebar-toggle` element. */}
+      {/* Hamburger — fixed top-left when sidebar is collapsed. Hidden on
+          mobile (the bottom-nav handles primary navigation below md). */}
       <button
         type="button"
         onClick={toggle}
         aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
-        className={`fixed top-3 z-50 flex h-10 w-10 items-center justify-center rounded bg-navy text-paper shadow-press-sm transition-[left] ${
+        className={`fixed top-3 z-50 hidden h-10 w-10 items-center justify-center rounded bg-navy text-paper shadow-press-sm transition-[left] md:flex ${
           collapsed ? "left-3" : "left-[252px]"
         }`}
       >
@@ -100,7 +100,7 @@ export function Sidebar() {
       <aside
         id="app-sidebar"
         aria-label="Primary"
-        className={`sidebar sticky top-0 z-20 flex h-screen flex-col gap-6 border-r-4 border-ink bg-navy px-4 py-5 text-paper transition-transform ${
+        className={`sidebar sticky top-0 z-20 hidden h-screen flex-col gap-6 border-r-4 border-ink bg-navy px-4 py-5 text-paper transition-transform md:flex ${
           collapsed ? "-translate-x-full" : "translate-x-0"
         }`}
         style={{ boxShadow: "4px 0 0 var(--color-gold)" }}

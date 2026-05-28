@@ -81,6 +81,53 @@
   [hidden] {
     display: none !important;
   }
+
+  /* Visible focus rings — never use the default browser styles because
+   * they're invisible against the paper background. */
+  *:focus-visible {
+    outline: 3px solid var(--color-red);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Skip-to-content link — anchored top-left, slides in on focus.
+   * Mandatory for screen-reader + keyboard users to bypass the sidebar. */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 8px;
+    z-index: 100;
+    padding: 8px 16px;
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-family: var(--font-condensed);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-decoration: none;
+    transition: top 0.15s ease-out;
+  }
+  .skip-link:focus {
+    top: 8px;
+  }
+}
+
+/*
+ * Respect prefers-reduced-motion. Disable site-wide animations + cap
+ * any decorative transitions. Mandatory for motion-sensitive users.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Static halftone (no smooth fades). */
+  body::before {
+    mix-blend-mode: multiply;
+  }
 }
 
 /*

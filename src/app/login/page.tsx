@@ -23,6 +23,10 @@ export default async function LoginPage() {
           <p className="text-sm text-sepia">Enter the arena.</p>
         </div>
         <LoginForm />
+        <div className="flex items-center justify-center gap-1.5 text-xs text-sepia">
+          <span aria-hidden>🔒</span>
+          <span>Encrypted in transit. Cookies are httpOnly + Secure.</span>
+        </div>
         <div className="text-center text-sm text-sepia">
           No account?{" "}
           <Link href="/register" className="font-semibold text-red hover:underline">

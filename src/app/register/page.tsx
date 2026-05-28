@@ -22,6 +22,10 @@ export default async function RegisterPage() {
           <p className="text-sm text-sepia">Pick a callsign. Earn your rank.</p>
         </div>
         <RegisterForm />
+        <div className="flex items-center justify-center gap-1.5 text-xs text-sepia">
+          <span aria-hidden>🔒</span>
+          <span>Encrypted in transit. We never store your password in plaintext.</span>
+        </div>
         <div className="text-center text-sm text-sepia">
           Already in?{" "}
           <Link href="/login" className="font-semibold text-red hover:underline">

@@ -30,10 +30,57 @@ const specialElite = Special_Elite({
   display: "swap",
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://debatethisnow.com";
+
 export const metadata: Metadata = {
-  title: "DebateThis",
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: "DebateThis — An Online Arena for Arguments",
+    template: "%s · DebateThis",
+  },
   description:
-    "An online arena for arguments. Three rounds. One winner. Real Elo.",
+    "Compete in structured 1v1 debates. Three rounds. One winner. Real Elo. Free to play, bot opponents available 24/7.",
+  applicationName: "DebateThis",
+  keywords: [
+    "debate",
+    "online debate",
+    "1v1 debate",
+    "argument practice",
+    "debate Elo",
+    "debate AI",
+    "structured argument",
+  ],
+  authors: [{ name: "DebateThis" }],
+  creator: "DebateThis",
+  openGraph: {
+    type: "website",
+    url: BASE_URL,
+    title: "DebateThis — An Online Arena for Arguments",
+    description:
+      "Three rounds. One winner. Real Elo. Compete head-to-head or against AI bots.",
+    siteName: "DebateThis",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DebateThis — An Online Arena for Arguments",
+    description: "Three rounds. One winner. Real Elo.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
 };
 
 export default function RootLayout({

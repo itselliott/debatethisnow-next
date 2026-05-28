@@ -1,9 +1,14 @@
 /**
  * /results/<id> — end-screen recap. Polls /api/debates/<id> until the
  * result row exists (or status flips to completed/abandoned).
+ *
+ * Public, indexable page — has its own Metadata + JSON-LD so social
+ * shares render rich preview cards and Google indexes it as a
+ * DiscussionForumPosting.
  */
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { toDebateDict } from "@/lib/serializers/debate";
 import { toDebateResultDict } from "@/lib/serializers/debate-result";
@@ -12,7 +17,37 @@ import {
   roundBreakdown,
 } from "@/lib/services/scoring-service";
 
-export const metadata = { title: "Results · DebateThis" };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const debateId = Number.parseInt(id, 10);
+  if (!Number.isInteger(debateId)) {
+    return { title: "Results · DebateThis" };
+  }
+  const d = await prisma.debate.findUnique({
+    where: { id: debateId },
+    include: { player1: true, player2: true },
+  });
+  if (!d) return { title: "Results · DebateThis" };
+  const p1 = d.player1?.username ?? "?";
+  const p2 = d.player2?.username ?? "?";
+  const title = `${p1} vs ${p2}: ${d.topic}`;
+  const description = `Final debate score and Elo deltas. ${d.category ?? "Society"}.`;
+  return {
+    title,
+    description,
+    openGraph: {
+      type: "article",
+      title,
+      description,
+      url: `/results/${debateId}`,
+    },
+    twitter: { card: "summary_large_image", title, description },
+  };
+}
 
 export default async function ResultsPage({
   params,
