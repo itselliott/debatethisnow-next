@@ -26,15 +26,27 @@ interface NavLink {
   labelKey: PhraseKey;
 }
 
-const NAV_LINKS: NavLink[] = [
+// Full nav for authenticated users.
+const AUTHED_NAV: NavLink[] = [
   { href: "/dashboard", labelKey: "nav_home" },
   { href: "/leaderboard", labelKey: "nav_rankings" },
   { href: "/profile", labelKey: "nav_my_debates" },
+  { href: "/achievements", labelKey: "nav_achievements" },
   { href: "/friends", labelKey: "nav_friends" },
   { href: "/bots", labelKey: "nav_bots" },
   { href: "/blog", labelKey: "nav_blog" },
   { href: "/how-it-works", labelKey: "nav_how_it_works" },
   { href: "/settings", labelKey: "nav_settings" },
+];
+
+// Trimmed nav for anonymous spectators. Everything else (Home, My
+// Debates, Friends, Settings) requires an account; Blog + How It
+// Works are still discoverable via direct URLs and the landing page.
+// The sidebar stays focused on the two surfaces an anon user can
+// actually use: see who's winning, watch the bots argue.
+const ANON_NAV: NavLink[] = [
+  { href: "/leaderboard", labelKey: "nav_rankings" },
+  { href: "/bots", labelKey: "nav_bots" },
 ];
 
 function isActive(currentPath: string, href: string): boolean {
@@ -47,6 +59,14 @@ function isActive(currentPath: string, href: string): boolean {
 export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   const pathname = usePathname();
   const { t } = useTone();
+  const me = useCurrentUser();
+  // Anonymous users (no session) get the two-link nav. While the auth
+  // check is still loading, optimistically show the authed nav — for
+  // signed-in users this prevents a flash of the trimmed list, and
+  // for anon users the items they shouldn't have access to just route
+  // through the proxy's redirect to /login.
+  const isAnon = !me.isLoading && me.data === null;
+  const navLinks = isAnon ? ANON_NAV : AUTHED_NAV;
 
   return (
     <aside
@@ -85,7 +105,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
       </span>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {NAV_LINKS.map((link) => (
+        {navLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}

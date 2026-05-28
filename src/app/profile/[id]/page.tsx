@@ -8,8 +8,16 @@ import { prisma } from "@/lib/db";
 import { toPublicDict } from "@/lib/serializers/user";
 import { toUserStatsDict } from "@/lib/serializers/user-stats";
 import { toDebateDict } from "@/lib/serializers/debate";
+import { toUserAchievementDict } from "@/lib/serializers/achievement";
 
 export const metadata = { title: "Profile · DebateThis" };
+
+const TIER_COLORS: Record<string, string> = {
+  bronze: "border-[#cd7f32] bg-[#cd7f32]/10 text-[#7a4a1a]",
+  silver: "border-[#9ca3af] bg-[#9ca3af]/10 text-[#4b5563]",
+  gold: "border-gold bg-gold/10 text-gold-dark",
+  legendary: "border-red bg-red/10 text-red",
+};
 
 export default async function ProfilePage({
   params,
@@ -19,22 +27,31 @@ export default async function ProfilePage({
   const { id } = await params;
   const userId = Number.parseInt(id, 10);
   if (!Number.isInteger(userId)) notFound();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { stats: true },
-  });
+  // Parallel fetch: user + stats, recent debates, earned achievements.
+  const [user, recent, achievementRows] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      include: { stats: true },
+    }),
+    prisma.debate.findMany({
+      where: {
+        status: "completed",
+        OR: [{ player1_id: userId }, { player2_id: userId }],
+      },
+      orderBy: { completed_at: "desc" },
+      take: 10,
+      include: { player1: true, player2: true },
+    }),
+    prisma.userAchievement.findMany({
+      where: { user_id: userId },
+      orderBy: { awarded_at: "desc" },
+      include: { achievement: true },
+    }),
+  ]);
   if (!user) notFound();
-  const recent = await prisma.debate.findMany({
-    where: {
-      status: "completed",
-      OR: [{ player1_id: userId }, { player2_id: userId }],
-    },
-    orderBy: { completed_at: "desc" },
-    take: 10,
-    include: { player1: true, player2: true },
-  });
   const d = toPublicDict(user);
   const stats = user.stats ? toUserStatsDict(user.stats) : null;
+  const achievements = achievementRows.map(toUserAchievementDict);
 
   return (
     <div className="space-y-6">
@@ -56,6 +73,52 @@ export default async function ProfilePage({
           <Stat label="Total Arguments" value={stats.total_arguments ?? 0} />
         </section>
       ) : null}
+
+      <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="font-display text-lg">Achievements</h2>
+          <Link
+            href="/achievements"
+            className="font-condensed text-xs uppercase tracking-wider text-red hover:underline"
+          >
+            See all 11 ▸
+          </Link>
+        </div>
+        {achievements.length === 0 ? (
+          <p className="text-sm text-sepia">
+            No achievements yet — keep debating to start unlocking.
+          </p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {achievements.map((a) => {
+              const tierClass =
+                TIER_COLORS[a.tier ?? "bronze"] ?? TIER_COLORS.bronze;
+              return (
+                <li
+                  key={a.code}
+                  className={`flex items-center gap-3 rounded border-2 ${tierClass} px-3 py-2`}
+                  title={a.description}
+                >
+                  <span aria-hidden className="text-2xl leading-none">
+                    {a.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-display text-sm text-ink">
+                      {a.name}
+                    </div>
+                    <div className="truncate text-[10px] uppercase tracking-wider text-sepia">
+                      {a.tier ?? "bronze"}
+                      {a.awarded_at
+                        ? ` · ${new Date(a.awarded_at).toLocaleDateString()}`
+                        : ""}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
         <h2 className="mb-3 font-display text-lg">Recent Debates</h2>

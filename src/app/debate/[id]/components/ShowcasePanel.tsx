@@ -22,6 +22,12 @@ export function ShowcasePanel({
   const state = useStore(store, (s) => s.state);
   const socket = useSocket();
   if (!state) return null;
+  // viewerId === 0 → anonymous spectator. They can WATCH the showcase
+  // (that's the whole point of opening it up without a login wall) but
+  // they can't drive it forward — Advance Round / Open Voting /
+  // Abandon all require auth on the server anyway. Surfacing dead
+  // controls would just confuse them, so the whole panel is hidden.
+  if (viewerId === 0) return null;
   const isParticipant =
     state.player1?.id === viewerId || state.player2?.id === viewerId;
   if (isParticipant) return null;

@@ -74,6 +74,7 @@ export type PhraseKey =
   | "nav_how_it_works"
   | "nav_settings"
   | "nav_profile"
+  | "nav_achievements"
   | "nav_more"
   | "nav_terms"
   | "nav_privacy"
@@ -327,6 +328,7 @@ const PHRASES: Record<PhraseKey, Entry> = {
   nav_how_it_works: { en: "How It Works", es: "Cómo Funciona" },
   nav_settings: { en: "Settings", es: "Ajustes" },
   nav_profile: { en: "Profile", es: "Perfil" },
+  nav_achievements: { en: "Achievements", es: "Logros" },
   nav_more: { en: "More", es: "Más" },
   nav_terms: { en: "Terms", es: "Términos" },
   nav_privacy: { en: "Privacy", es: "Privacidad" },

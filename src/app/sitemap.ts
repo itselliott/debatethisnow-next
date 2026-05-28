@@ -16,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/how-it-works", priority: 0.7, freq: "monthly" as const },
     { path: "/leaderboard", priority: 0.6, freq: "daily" as const },
     { path: "/bots", priority: 0.6, freq: "weekly" as const },
+    { path: "/achievements", priority: 0.5, freq: "monthly" as const },
     { path: "/login", priority: 0.4, freq: "yearly" as const },
     { path: "/register", priority: 0.4, freq: "yearly" as const },
     { path: "/terms", priority: 0.2, freq: "yearly" as const },
