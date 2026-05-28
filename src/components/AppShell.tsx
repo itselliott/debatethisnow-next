@@ -13,19 +13,23 @@
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { SoundAmbience } from "@/components/SoundAmbience";
+import { useTone } from "@/lib/hooks/use-tone";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/register"]);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t } = useTone();
   const isPublic = PUBLIC_PATHS.has(pathname);
 
   if (isPublic) {
     return (
       <>
         <a href="#main-content" className="skip-link">
-          Skip to content
+          {t("skip_to_content")}
         </a>
+        <SoundAmbience />
         <div id="main-content">{children}</div>
       </>
     );
@@ -34,8 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <a href="#main-content" className="skip-link">
-        Skip to content
+        {t("skip_to_content")}
       </a>
+      <SoundAmbience />
       {/* Desktop: 240px sidebar + main grid. Mobile: single column, sidebar
           itself hides via `md:flex` rules in Sidebar.tsx. */}
       <div className="app-shell min-h-screen md:grid md:grid-cols-[240px_1fr] md:data-[collapsed=true]:grid-cols-[0_1fr]">

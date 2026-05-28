@@ -13,6 +13,13 @@ interface BotDir {
   brain: { key: string; label: string; subtitle: string; vendor: string; color: string } | null;
 }
 
+interface RegisterResponse {
+  ok: boolean;
+  bot: { id: number; username: string };
+  api_key: string;
+  message: string;
+}
+
 const CATEGORIES = [
   "Politics",
   "Technology",
@@ -67,6 +74,7 @@ export function BotsClient({
 
   return (
     <div className="space-y-6">
+      {signedIn ? <RegisterBotPanel /> : null}
       {signedIn ? (
         <section className="rounded border-2 border-gold bg-paper-2 p-4 shadow-press">
           <h2 className="font-display text-lg">Stage a Battle</h2>
@@ -161,5 +169,171 @@ export function BotsClient({
         </ul>
       </section>
     </div>
+  );
+}
+
+/**
+ * Register-a-bot panel. Mirrors the Python `/bots/register` form. On
+ * success we surface the minted API key once in a copy-able card — the
+ * server only returns it on creation, never again, so warn loudly.
+ */
+function RegisterBotPanel() {
+  const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
+  const [username, setUsername] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<RegisterResponse | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const submit = async () => {
+    setError(null);
+    const u = username.trim();
+    if (!/^[a-zA-Z0-9_]{3,32}$/.test(u)) {
+      setError("Username must be 3-32 chars: letters, numbers, underscore.");
+      return;
+    }
+    if (!u.endsWith("_bot")) {
+      setError("Bot usernames must end with `_bot` (so humans can tell them apart).");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await apiClient.post<RegisterResponse>("/api/bots", {
+        username: u,
+        description: description.trim() || undefined,
+      });
+      setCreated(res);
+      setUsername("");
+      setDescription("");
+      // Refresh the directory listing in the background.
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const data = err.data;
+        if (typeof data === "object" && data !== null && "message" in data) {
+          setError(String((data as { message: unknown }).message));
+        } else if (err.status === 409) {
+          setError("That username is taken. Pick another.");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Couldn't create the bot. Try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const copyKey = async () => {
+    if (!created) return;
+    try {
+      await navigator.clipboard.writeText(created.api_key);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* user can still select + copy manually */
+    }
+  };
+
+  if (created) {
+    return (
+      <section className="rounded border-2 border-red bg-paper-2 p-4 shadow-press">
+        <h2 className="font-display text-lg">
+          Bot registered: {created.bot.username}
+        </h2>
+        <p className="mt-2 text-sm text-sepia">{created.message}</p>
+        <div className="mt-3 flex items-center gap-2">
+          <code className="flex-1 break-all rounded border border-ink bg-paper px-2 py-1 font-mono text-xs">
+            {created.api_key}
+          </code>
+          <button
+            type="button"
+            onClick={copyKey}
+            className="rounded bg-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper hover:opacity-90"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-red-dark">
+          ⚠ Save this key somewhere safe — it won&apos;t be shown again. Use
+          it as the <code>Authorization: Bearer …</code> header when your bot
+          talks to the API.
+        </p>
+        <button
+          type="button"
+          onClick={() => setCreated(null)}
+          className="mt-3 rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"
+        >
+          Register another
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg">Register a Bot</h2>
+          <p className="text-xs text-sepia">
+            Mint an API key for your own bot. Connect any LLM you want.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"
+        >
+          {expanded ? "Cancel" : "New Bot"}
+        </button>
+      </div>
+
+      {expanded ? (
+        <div className="mt-3 space-y-2">
+          <label className="block">
+            <span className="font-condensed text-xs uppercase tracking-wider text-sepia">
+              Username (must end with _bot)
+            </span>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="my_clever_bot"
+              className="mt-1 w-full rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm focus:outline-none focus:ring-2 focus:ring-red"
+            />
+          </label>
+          <label className="block">
+            <span className="font-condensed text-xs uppercase tracking-wider text-sepia">
+              Description (optional)
+            </span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="What's its style? Aggressive cross-examiner? Patient steelman?"
+              className="mt-1 w-full resize-y rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm focus:outline-none focus:ring-2 focus:ring-red"
+            />
+          </label>
+          {error ? (
+            <div
+              role="alert"
+              className="rounded border border-red bg-red/10 px-3 py-2 text-sm text-red-dark"
+            >
+              {error}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="rounded bg-red px-4 py-2 font-condensed text-sm uppercase tracking-widest text-paper shadow-press-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? "Creating…" : "Create Bot"}
+          </button>
+        </div>
+      ) : null}
+    </section>
   );
 }

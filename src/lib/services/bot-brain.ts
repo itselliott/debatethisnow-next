@@ -18,6 +18,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { Groq } from "groq-sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import type { User } from "@prisma/client";
@@ -58,6 +59,24 @@ export const BRAINS: Record<string, BrainMeta> = {
     subtitle: "Llama 3.3 70B · Cerebras",
     vendor: "Cerebras",
     color: "#b6353f",
+  },
+  "claude-haiku-4-5": {
+    label: "Claude Haiku 4.5",
+    subtitle: "Fast, cheap · Anthropic",
+    vendor: "Anthropic",
+    color: "#cc785c",
+  },
+  "claude-sonnet-4-6": {
+    label: "Claude Sonnet 4.6",
+    subtitle: "Balanced reasoning · Anthropic",
+    vendor: "Anthropic",
+    color: "#cc785c",
+  },
+  "claude-opus-4-6": {
+    label: "Claude Opus 4.6",
+    subtitle: "Top tier · Anthropic",
+    vendor: "Anthropic",
+    color: "#cc785c",
   },
 };
 
@@ -590,6 +609,66 @@ async function generateWithCerebras(args: GenerateArgs): Promise<string | null> 
   );
 }
 
+// Anthropic SDK is lazy-init'd at first use. Skipping the constructor when
+// ANTHROPIC_API_KEY is absent means a dev with no key set never trips the
+// SDK's "missing API key" exception just by loading this module.
+let _anthropic: Anthropic | null = null;
+function getAnthropicClient(): Anthropic | null {
+  if (!env.ANTHROPIC_API_KEY) return null;
+  if (_anthropic) return _anthropic;
+  _anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  return _anthropic;
+}
+
+// `bot_model` setting → Anthropic API model id. Picker keys mirror
+// /api/settings/bot's catalog so the existing Settings UI keeps working.
+const CLAUDE_MODEL_IDS: Record<string, string> = {
+  "claude-haiku-4-5": "claude-haiku-4-5",
+  "claude-sonnet-4-6": "claude-sonnet-4-6",
+  "claude-opus-4-6": "claude-opus-4-6",
+};
+
+function makeClaudeGenerator(modelId: string) {
+  return async function generateWithClaude(
+    args: GenerateArgs,
+  ): Promise<string | null> {
+    const client = getAnthropicClient();
+    if (!client) return null;
+    const { system, user } = buildPrompt(
+      args.personality,
+      args.topic,
+      args.side,
+      args.roundNumber,
+      args.prior,
+      args.myUsername,
+      args.oppUsername,
+    );
+    try {
+      const resp = await client.messages.create({
+        model: modelId,
+        max_tokens: 600,
+        temperature: 0.7,
+        system,
+        messages: [{ role: "user", content: user }],
+      });
+      // The content is an array of blocks; the only block we expect from
+      // a non-tool-using call is a single `text` block. Defensive join in
+      // case future API revisions return multiple.
+      const text = resp.content
+        .map((block) => (block.type === "text" ? block.text : ""))
+        .join("")
+        .trim();
+      return text || null;
+    } catch (err) {
+      console.warn(
+        `[bot-brain] Claude (${modelId}) call failed:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  };
+}
+
 interface GenerateArgs {
   personality: string;
   topic: string;
@@ -605,7 +684,34 @@ const BRAIN_GENERATORS: Record<string, (args: GenerateArgs) => Promise<string | 
   gemini: generateWithGemini,
   mistral: generateWithMistral,
   cerebras: generateWithCerebras,
+  "claude-haiku-4-5": makeClaudeGenerator(CLAUDE_MODEL_IDS["claude-haiku-4-5"]!),
+  "claude-sonnet-4-6": makeClaudeGenerator(CLAUDE_MODEL_IDS["claude-sonnet-4-6"]!),
+  "claude-opus-4-6": makeClaudeGenerator(CLAUDE_MODEL_IDS["claude-opus-4-6"]!),
 };
+
+// Global override pulled from app_settings.bot_model. The Settings page
+// + /api/settings/bot let an admin pick "templates" (force canned) or a
+// Claude tier; both win over the bot's own assigned brain when set.
+// Cached in-process for 30s so we don't query Postgres every turn.
+const BOT_MODEL_KEY = "bot_model";
+let _botModelCache: { value: string | null; expiresAt: number } | null = null;
+
+async function readGlobalBotModelOverride(): Promise<string | null> {
+  const now = Date.now();
+  if (_botModelCache && _botModelCache.expiresAt > now) {
+    return _botModelCache.value;
+  }
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: BOT_MODEL_KEY },
+    });
+    const value = row?.value ?? null;
+    _botModelCache = { value, expiresAt: now + 30_000 };
+    return value;
+  } catch {
+    return null;
+  }
+}
 
 async function generate(brain: string, args: GenerateArgs): Promise<string | null> {
   const fn = BRAIN_GENERATORS[brain] ?? generateWithGroq;
@@ -757,15 +863,25 @@ export async function takeTurnNow(
     return null;
   }
   const personality = getPersonality(bot);
-  const brain = getBrain(bot);
+  const assignedBrain = getBrain(bot);
   const opp = debate.player1_id === bot.id ? debate.player2 : debate.player1;
   const side =
     debate.player1_id === bot.id
       ? debate.side_player1 ?? "FOR"
       : debate.side_player2 ?? "AGAINST";
 
+  // Global override (admin Settings page) wins over the bot's assigned
+  // brain. "templates" forces canned. Unknown/empty override falls back
+  // to the bot's assignment.
+  const override = await readGlobalBotModelOverride();
+  const forceCanned = override === "templates";
+  const brain =
+    !forceCanned && override && override in BRAIN_GENERATORS
+      ? override
+      : assignedBrain;
+
   console.log(
-    `[bot-brain] ${bot.username}: generating R${debate.current_round} (${side}) via brain=${brain} personality=${personality}`,
+    `[bot-brain] ${bot.username}: generating R${debate.current_round} (${side}) via brain=${forceCanned ? "templates(forced)" : brain} personality=${personality}`,
   );
 
   const prior: PriorMessage[] = debate.messages.map((m) => ({
@@ -774,19 +890,26 @@ export async function takeTurnNow(
     author_username: m.author?.username ?? "?",
     content: m.content,
   }));
-  let content = await generate(brain, {
-    personality,
-    topic: debate.topic,
-    side,
-    roundNumber: debate.current_round ?? 1,
-    prior,
-    myUsername: bot.username,
-    oppUsername: opp?.username ?? "opponent",
-  });
+  let content: string | null = null;
+  if (!forceCanned) {
+    content = await generate(brain, {
+      personality,
+      topic: debate.topic,
+      side,
+      roundNumber: debate.current_round ?? 1,
+      prior,
+      myUsername: bot.username,
+      oppUsername: opp?.username ?? "opponent",
+    });
+  }
   let usedFallback = false;
   if (!content || content.split(/\s+/).filter(Boolean).length < 15) {
     usedFallback = true;
-    const reason = !content ? "no response" : `only ${content.split(/\s+/).length} words`;
+    const reason = forceCanned
+      ? "templates override"
+      : !content
+        ? "no response"
+        : `only ${content.split(/\s+/).length} words`;
     console.log(
       `[bot-brain] ${bot.username} (${brain}): falling back to canned template (${reason})`,
     );

@@ -15,23 +15,26 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
 import { useSoundToggle } from "@/lib/hooks/use-sound";
+import { useTone } from "@/lib/hooks/use-tone";
+import type { PhraseKey } from "@/lib/tone/phrases";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 const SIDEBAR_KEY = "debatethis.sidebarCollapsed";
 
 interface NavLink {
   href: string;
-  label: string;
+  labelKey: PhraseKey;
 }
 
 const NAV_LINKS: NavLink[] = [
-  { href: "/dashboard", label: "Home" },
-  { href: "/leaderboard", label: "Rankings" },
-  { href: "/profile", label: "My Debates" },
-  { href: "/friends", label: "Friends" },
-  { href: "/bots", label: "Bot Arena" },
-  { href: "/blog", label: "Blog" },
-  { href: "/how-it-works", label: "How It Works" },
-  { href: "/settings", label: "Settings" },
+  { href: "/dashboard", labelKey: "nav_home" },
+  { href: "/leaderboard", labelKey: "nav_rankings" },
+  { href: "/profile", labelKey: "nav_my_debates" },
+  { href: "/friends", labelKey: "nav_friends" },
+  { href: "/bots", labelKey: "nav_bots" },
+  { href: "/blog", labelKey: "nav_blog" },
+  { href: "/how-it-works", labelKey: "nav_how_it_works" },
+  { href: "/settings", labelKey: "nav_settings" },
 ];
 
 function isActive(currentPath: string, href: string): boolean {
@@ -43,6 +46,7 @@ function isActive(currentPath: string, href: string): boolean {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { t } = useTone();
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -125,7 +129,7 @@ export function Sidebar() {
           </button>
         </div>
         <span className="-mt-4 font-condensed text-xs uppercase tracking-[0.28em] text-paper-3">
-          The Arena
+          {t("sidebar_arena")}
         </span>
 
         <nav className="flex flex-1 flex-col gap-1">
@@ -141,7 +145,7 @@ export function Sidebar() {
                   : "text-paper"
               }`}
             >
-              {link.label}
+              {t(link.labelKey)}
             </Link>
           ))}
         </nav>
@@ -154,16 +158,11 @@ export function Sidebar() {
 
 function SidebarFooter() {
   const me = useCurrentUser();
+  const { t } = useTone();
   return (
     <div className="flex flex-col gap-3 border-t border-ink-soft pt-3 text-sm">
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative font-condensed text-xs uppercase tracking-wider text-paper hover:text-gold"
-        >
-          <span aria-hidden>🔔</span> Notifications
-        </button>
+        <NotificationCenter />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -172,7 +171,7 @@ function SidebarFooter() {
         </span>
         <span className="text-xs text-paper-3">
           {me.data
-            ? `Elo ${me.data.elo_rating} · ${me.data.rank_tier ?? ""}`
+            ? `${t("elo_label")} ${me.data.elo_rating} · ${me.data.rank_tier ?? ""}`
             : "—"}
         </span>
         <div className="flex gap-2">
@@ -183,10 +182,10 @@ function SidebarFooter() {
 
       <div className="flex gap-3 text-[11px] text-paper-3">
         <Link href="/terms" className="hover:text-gold">
-          Terms
+          {t("nav_terms")}
         </Link>
         <Link href="/privacy" className="hover:text-gold">
-          Privacy
+          {t("nav_privacy")}
         </Link>
       </div>
     </div>
@@ -195,6 +194,7 @@ function SidebarFooter() {
 
 function SoundToggleButton() {
   const { muted, toggle } = useSoundToggle();
+  const { t } = useTone();
   return (
     <button
       type="button"
@@ -207,12 +207,14 @@ function SoundToggleButton() {
       }
       className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
     >
-      <span aria-hidden>♪</span> {muted ? "Sound Off" : "Sound On"}
+      <span aria-hidden>♪</span>{" "}
+      {muted ? t("sidebar_sound_off") : t("sidebar_sound_on")}
     </button>
   );
 }
 
 function LogoutButton() {
+  const { t } = useTone();
   const handleLogout = useCallback(async () => {
     const csrf = document.cookie
       .split(";")
@@ -238,7 +240,7 @@ function LogoutButton() {
       onClick={handleLogout}
       className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-red hover:text-paper"
     >
-      Log Out
+      {t("sidebar_log_out")}
     </button>
   );
 }

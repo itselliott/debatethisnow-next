@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient, ApiError } from "@/lib/api-client";
-import { useTone } from "@/lib/hooks/use-tone";
+import { useLang, useTone } from "@/lib/hooks/use-tone";
+import type { Lang } from "@/lib/tone/phrases";
 
-const LANGUAGES = [
+const LANGUAGES: Array<{ code: Lang; label: string; flag: string }> = [
   { code: "en", label: "English", flag: "🇺🇸" },
   { code: "es", label: "Español", flag: "🇪🇸" },
 ];
-const LANG_KEY = "debatethis.lang";
 
 export function SettingsClient({
   username,
@@ -19,28 +19,10 @@ export function SettingsClient({
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  const [lang, setLang] = useState<string>("en");
+  const { lang, setLang } = useLang();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   void isAdmin;
-
-  useEffect(() => {
-    try {
-      const v = window.localStorage.getItem(LANG_KEY);
-      if (v) setLang(v);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const setLanguage = (code: string) => {
-    setLang(code);
-    try {
-      window.localStorage.setItem(LANG_KEY, code);
-    } catch {
-      /* ignore */
-    }
-  };
 
   const deleteAccount = async () => {
     setError(null);
@@ -90,7 +72,7 @@ export function SettingsClient({
             <button
               key={l.code}
               type="button"
-              onClick={() => setLanguage(l.code)}
+              onClick={() => setLang(l.code)}
               className={`rounded border-2 ${lang === l.code ? "border-red bg-red text-paper" : "border-ink bg-paper text-ink"} px-3 py-2 font-condensed text-sm uppercase tracking-wider`}
             >
               {l.flag} {l.label}

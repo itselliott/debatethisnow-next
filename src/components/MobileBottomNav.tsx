@@ -14,27 +14,29 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTone } from "@/lib/hooks/use-tone";
+import type { PhraseKey } from "@/lib/tone/phrases";
 
 interface Tab {
   href: string;
-  label: string;
+  labelKey: PhraseKey;
   icon: string;
 }
 
 const PRIMARY_TABS: Tab[] = [
-  { href: "/dashboard", label: "Home", icon: "⌂" },
-  { href: "/leaderboard", label: "Ranks", icon: "≡" },
-  { href: "/friends", label: "Friends", icon: "☺" },
-  { href: "/bots", label: "Bots", icon: "◉" },
+  { href: "/dashboard", labelKey: "mobile_tab_home", icon: "⌂" },
+  { href: "/leaderboard", labelKey: "mobile_tab_ranks", icon: "≡" },
+  { href: "/friends", labelKey: "mobile_tab_friends", icon: "☺" },
+  { href: "/bots", labelKey: "mobile_tab_bots", icon: "◉" },
 ];
 
 const MORE_LINKS: Tab[] = [
-  { href: "/profile", label: "Profile", icon: "☻" },
-  { href: "/blog", label: "Blog", icon: "✎" },
-  { href: "/how-it-works", label: "How It Works", icon: "?" },
-  { href: "/settings", label: "Settings", icon: "✱" },
-  { href: "/terms", label: "Terms", icon: "§" },
-  { href: "/privacy", label: "Privacy", icon: "🔒" },
+  { href: "/profile", labelKey: "nav_profile", icon: "☻" },
+  { href: "/blog", labelKey: "nav_blog", icon: "✎" },
+  { href: "/how-it-works", labelKey: "nav_how_it_works", icon: "?" },
+  { href: "/settings", labelKey: "nav_settings", icon: "✱" },
+  { href: "/terms", labelKey: "nav_terms", icon: "§" },
+  { href: "/privacy", labelKey: "nav_privacy", icon: "🔒" },
 ];
 
 function isActive(currentPath: string, href: string): boolean {
@@ -46,6 +48,7 @@ function isActive(currentPath: string, href: string): boolean {
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const { t } = useTone();
   const [moreOpen, setMoreOpen] = useState(false);
 
   return (
@@ -69,7 +72,7 @@ export function MobileBottomNav() {
               <span aria-hidden className="text-xl leading-none">
                 {tab.icon}
               </span>
-              <span>{tab.label}</span>
+              <span>{t(tab.labelKey)}</span>
             </Link>
           );
         })}
@@ -82,7 +85,7 @@ export function MobileBottomNav() {
           <span aria-hidden className="text-xl leading-none">
             •••
           </span>
-          <span>More</span>
+          <span>{t("nav_more")}</span>
         </button>
       </nav>
 
@@ -103,6 +106,7 @@ function MoreSheet({
   onClose: () => void;
   activePath: string;
 }) {
+  const { t } = useTone();
   return (
     <div
       role="dialog"
@@ -132,7 +136,7 @@ function MoreSheet({
                   <span aria-hidden className="text-2xl leading-none">
                     {link.icon}
                   </span>
-                  <span className="text-center">{link.label}</span>
+                  <span className="text-center">{t(link.labelKey)}</span>
                 </Link>
               </li>
             );
@@ -143,7 +147,7 @@ function MoreSheet({
           onClick={onClose}
           className="mt-3 w-full rounded border border-ink bg-paper py-2 font-condensed text-xs uppercase tracking-widest"
         >
-          Close
+          {t("nav_close")}
         </button>
       </div>
     </div>
