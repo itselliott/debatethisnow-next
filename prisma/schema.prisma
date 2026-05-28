@@ -24,8 +24,17 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime queries go through Neon's pooled endpoint (PgBouncer in
+  // transaction mode). Cheap connections, scales horizontally.
+  url       = env("DATABASE_URL")
+  // Migrations + introspection need a SESSION-mode connection because
+  // they take advisory locks (SELECT pg_advisory_lock(...)) which
+  // transaction-mode pooling silently drops. Set DIRECT_URL to the
+  // unpooled Neon endpoint (drop the `-pooler` suffix from the
+  // hostname). Falls back to DATABASE_URL if unset so local dev with
+  // a non-pooled DB still works.
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================================

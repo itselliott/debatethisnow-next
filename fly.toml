@@ -15,6 +15,21 @@ primary_region = 'iad'
 
 [deploy]
   strategy = 'rolling'
+  # NOTE: migrations are run MANUALLY from the developer's machine via
+  # `npm run db:migrate:deploy` (with DIRECT_URL set in the local
+  # `.env`). They are deliberately NOT chained into a `release_command`
+  # here because Fly's release machine inherits whichever
+  # DATABASE_URL secret is set — and our DATABASE_URL points at
+  # Neon's pooled endpoint, which uses PgBouncer in transaction mode
+  # and silently drops the session-level advisory lock that
+  # `prisma migrate deploy` needs (causing P1002 timeouts and
+  # crash-looping deploys).
+  #
+  # To re-enable automated migrations on deploy:
+  #   1. Add a `DIRECT_URL` Fly secret pointing to the UNPOOLED Neon
+  #      endpoint (drop the `-pooler` suffix from the hostname).
+  #   2. Uncomment the line below.
+  # release_command = 'npx prisma migrate deploy'
 
 [env]
   # Defaults that don't need to be secrets. Real secret values

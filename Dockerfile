@@ -57,15 +57,22 @@ COPY --from=builder /app/src ./src
 
 EXPOSE 8080
 
-# Entrypoint:
-#   1. `prisma migrate deploy` — no-op on first deploy (schema already
-#      lives in Neon). On later deploys, applies any new migrations.
-#      If a migration FAILS, the entire entrypoint aborts and the
-#      container exits — we never want a half-migrated DB serving
-#      traffic.
-#   2. `tsx server.ts` — replaces the shell so signals (SIGTERM from
-#      Fly during rolling deploys) reach the worker cleanly.
-CMD ["/bin/sh", "-c", "\
-    npx prisma migrate deploy && \
-    exec npx tsx server.ts \
-"]
+# Entrypoint is JUST the server. Migrations were previously chained
+# into this command, but Neon's pooled DATABASE_URL uses PgBouncer in
+# transaction mode, which silently drops the session-level advisory
+# lock that `prisma migrate deploy` requires. The migrate call would
+# then time out (P1002) and the && chain meant the server never
+# started — crash-looping the machine.
+#
+# Migrations now run as a Fly `release_command` (see fly.toml), which:
+#   - executes ONCE per deploy on a one-off machine, not on every
+#     machine restart, so a transient DB hiccup doesn't crash-loop
+#     the running fleet
+#   - uses DIRECT_URL (set via `fly secrets set`) for the lock-safe
+#     session-mode connection
+#   - blocks deploy promotion if it fails, so a broken migration is
+#     caught BEFORE traffic switches over
+#
+# `exec` replaces the shell so SIGTERM from Fly during rolling deploys
+# reaches the Node worker cleanly.
+CMD ["/bin/sh", "-c", "exec npx tsx server.ts"]
