@@ -110,26 +110,58 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
 function SidebarFooter() {
   const me = useCurrentUser();
   const { t } = useTone();
+  // Three states: loading (show nothing definitive yet), anon (no
+  // session — surface the sign-up CTA), authed (normal user-mini).
+  const isAnon = !me.isLoading && me.data === null;
+
   return (
     <div className="flex flex-col gap-3 border-t border-ink-soft pt-3 text-sm">
-      <div className="flex items-center justify-between">
-        <NotificationCenter />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="truncate font-condensed uppercase tracking-wider text-paper-3">
-          {me.data?.username ?? "—"}
-        </span>
-        <span className="text-xs text-paper-3">
-          {me.data
-            ? `${t("elo_label")} ${me.data.elo_rating} · ${me.data.rank_tier ?? ""}`
-            : "—"}
-        </span>
-        <div className="flex gap-2">
-          <SoundToggleButton />
-          <LogoutButton />
+      {!isAnon ? (
+        <div className="flex items-center justify-between">
+          <NotificationCenter />
         </div>
-      </div>
+      ) : null}
+
+      {isAnon ? (
+        <div className="flex flex-col gap-2">
+          <span className="truncate font-condensed uppercase tracking-wider text-paper-3">
+            Spectator
+          </span>
+          <span className="text-xs text-paper-3">
+            Sign up to vote, debate, and rank.
+          </span>
+          <div className="flex gap-2">
+            <Link
+              href="/register"
+              className="flex-1 rounded bg-red px-2 py-1 text-center font-condensed text-[11px] uppercase tracking-wider text-paper hover:opacity-90"
+            >
+              Sign Up Free
+            </Link>
+            <Link
+              href="/login"
+              className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
+            >
+              Log In
+            </Link>
+          </div>
+          <SoundToggleButton />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <span className="truncate font-condensed uppercase tracking-wider text-paper-3">
+            {me.data?.username ?? "—"}
+          </span>
+          <span className="text-xs text-paper-3">
+            {me.data
+              ? `${t("elo_label")} ${me.data.elo_rating} · ${me.data.rank_tier ?? ""}`
+              : "—"}
+          </span>
+          <div className="flex gap-2">
+            <SoundToggleButton />
+            <LogoutButton />
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3 text-[11px] text-paper-3">
         <Link href="/terms" className="hover:text-gold">

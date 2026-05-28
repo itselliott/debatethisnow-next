@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
 import { useSocket } from "@/lib/hooks/use-socket";
@@ -17,8 +18,13 @@ export function VotePanel({
   const myVoteFor = useStore(store, (s) => s.myVoteFor);
   const socket = useSocket();
   if (!state) return null;
+  // viewerId === 0 → anonymous spectator (no logged-in user). They can
+  // see the vote tallies + the matchup but the vote buttons become a
+  // "Sign up to vote" CTA.
+  const isAnon = viewerId === 0;
   const isParticipant =
-    state.player1?.id === viewerId || state.player2?.id === viewerId;
+    !isAnon &&
+    (state.player1?.id === viewerId || state.player2?.id === viewerId);
   if (isParticipant) return null; // participants don't vote
 
   const castVote = (forId: number) => {
@@ -35,7 +41,25 @@ export function VotePanel({
           ? t("vote_title_final")
           : t("vote_title_live")}
       </h2>
-      {myVoteFor ? (
+
+      {isAnon ? (
+        // Anon spectators see the matchup but can't vote without an
+        // account — voter identity is needed to prevent ballot stuffing.
+        <div className="mt-3 rounded border-2 border-ink bg-paper p-4 text-center">
+          <p className="font-display text-base text-ink">
+            Sign up free to vote and decide who wins.
+          </p>
+          <p className="mt-1 text-xs text-sepia">
+            Takes 20 seconds. Your votes count toward the final result.
+          </p>
+          <Link
+            href="/register"
+            className="mt-3 inline-block rounded bg-red px-4 py-2 font-condensed text-sm uppercase tracking-widest text-paper shadow-press-sm hover:opacity-90"
+          >
+            Create Free Account ▸
+          </Link>
+        </div>
+      ) : myVoteFor ? (
         <p className="mt-2 text-sm text-sepia">
           {t("vote_receipt")}{" "}
           <strong className="text-ink">

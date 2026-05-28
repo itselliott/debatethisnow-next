@@ -8,8 +8,14 @@
  * The components themselves (Header, PlayerCard, Composer, TurnStrip,
  * MessagesList, VotePanel, ShowcasePanel, EndScreen) read from the store
  * via selectors so they only re-render on slices that changed.
+ *
+ * Connection-loss handling: the connection status banner appears the
+ * moment the socket disconnects so users know if they might be missing
+ * arguments. On reconnect we explicitly emit `join_debate` (which the
+ * server responds to with a full `debate_state`) — this re-syncs any
+ * messages or turn changes that happened while disconnected.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { useRouter } from "next/navigation";
 import { useSocket, useSocketEvent } from "@/lib/hooks/use-socket";
@@ -78,9 +84,15 @@ export function DebateRoom({
     return () => clearInterval(id);
   }, [store]);
 
-  // Join the debate room on mount, leave on unmount.
+  // Join the debate room on mount, leave on unmount. On reconnect we
+  // re-emit `join_debate` (server responds with a full debate_state)
+  // AND `request_state` as belt-and-suspenders — guarantees the client
+  // catches up on anything missed during the disconnect.
   useEffect(() => {
-    const join = () => socket.emit("join_debate", { debate_id: debateId });
+    const join = () => {
+      socket.emit("join_debate", { debate_id: debateId });
+      socket.emit("request_state", { debate_id: debateId });
+    };
     if (socket.connected) join();
     socket.on("connect", join);
     return () => {
@@ -88,6 +100,22 @@ export function DebateRoom({
       socket.emit("leave_debate", { debate_id: debateId });
     };
   }, [socket, debateId]);
+
+  // Connection-status banner. The user needs to know if their socket
+  // dropped, otherwise they'd watch an empty room and think the system
+  // is broken.
+  const [connected, setConnected] = useState(true);
+  useEffect(() => {
+    setConnected(socket.connected);
+    const onConnect = () => setConnected(true);
+    const onDisconnect = () => setConnected(false);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+    };
+  }, [socket]);
 
   // ---- Socket event subscriptions ----
   useSocketEvent<DebateDict & { my_role?: string; my_vote?: number | null; spectator_count?: number }>(
@@ -149,6 +177,17 @@ export function DebateRoom({
     },
   );
 
+  // `voting_open` fires after the closing argument lands. The server
+  // also broadcasts `debate_state` so status flips to "voting", but
+  // an explicit request_state here guarantees we never display a stale
+  // "live" status when voting has actually begun.
+  useSocketEvent<{ debate_id: number; seconds: number }>(
+    "voting_open",
+    () => {
+      socket.emit("request_state", { debate_id: debateId });
+    },
+  );
+
   useSocketEvent<{ debate_id: number; count: number }>(
     "spectator_count",
     (payload) => {
@@ -188,6 +227,15 @@ export function DebateRoom({
 
   return (
     <div className="space-y-6">
+      {!connected ? (
+        <div
+          role="alert"
+          className="rounded border-2 border-gold bg-paper-2 px-3 py-2 font-condensed text-xs uppercase tracking-wider text-ink shadow-press-sm"
+        >
+          <span aria-hidden className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-gold-dark" />
+          Reconnecting… your view may be a few seconds behind.
+        </div>
+      ) : null}
       <DebateHeader store={store} viewerId={viewerId} />
       {isPrep ? <PrepBanner store={store} viewerId={viewerId} /> : null}
       <PlayerCards store={store} viewerId={viewerId} />

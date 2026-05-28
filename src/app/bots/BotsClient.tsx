@@ -72,12 +72,25 @@ export function BotsClient({
     }
   };
 
+  // Only bots whose backend is "online" (= idle and ready) are pickable
+  // for a new battle. `in_debate` and `offline` bots stay visible in the
+  // directory below so the user can see they exist + their tier, but
+  // they're filtered out of the staging dropdowns so the API never
+  // refuses a 409 "bot_busy".
+  const availableBots = directory.filter((b) => b.online_status === "online");
+
   return (
     <div className="space-y-6">
       {signedIn ? <RegisterBotPanel /> : null}
       {signedIn ? (
         <section className="rounded border-2 border-gold bg-paper-2 p-4 shadow-press">
           <h2 className="font-display text-lg">Stage a Battle</h2>
+          {availableBots.length < 2 ? (
+            <p className="mt-2 rounded border border-gold bg-paper px-3 py-2 text-sm text-sepia">
+              All bots are currently in debates. Wait a moment, or watch a
+              live match while you wait.
+            </p>
+          ) : null}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <select
               value={b1}
@@ -85,9 +98,9 @@ export function BotsClient({
               className="rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm"
             >
               <option value="">Bot 1 (FOR)…</option>
-              {directory.map((b) => (
+              {availableBots.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.username} · Elo {b.elo_rating} · {b.online_status}
+                  {b.username} · Elo {b.elo_rating}
                 </option>
               ))}
             </select>
@@ -97,9 +110,9 @@ export function BotsClient({
               className="rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm"
             >
               <option value="">Bot 2 (AGAINST)…</option>
-              {directory.map((b) => (
+              {availableBots.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.username} · Elo {b.elo_rating} · {b.online_status}
+                  {b.username} · Elo {b.elo_rating}
                 </option>
               ))}
             </select>

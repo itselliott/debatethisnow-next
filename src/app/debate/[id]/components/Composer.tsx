@@ -1,6 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/**
+ * Argument composer — owns the textarea, word-count gating, and the
+ * `submit_argument` emit. UX is OPTIMISTIC: as soon as the user clicks
+ * submit we clear the textarea and re-enable the submit button — we
+ * don't wait for the server's `argument_posted` echo to come back.
+ *
+ * Why optimistic:
+ *   - The previous "wait for argument_posted echo to clear" pattern got
+ *     users stuck in "Submitting…" forever on any of: dropped socket
+ *     event, server slowness, race conditions with the dedicated
+ *     listener. The MessagesList still updates correctly via the
+ *     DebateRoom's own `argument_posted` listener (which appends to
+ *     the store), so the visible feedback ("my message just appeared")
+ *     is identical between optimistic and ack-based.
+ *   - If the server rejects (rate-limited, min/max words, status
+ *     changed, etc.), the error listener restores the text so the user
+ *     can fix and retry — no data loss.
+ *
+ * Error handling: a single, always-mounted `error` socket listener
+ * (via useEffect) captures any submission rejection. No more attach-
+ * inside-submit pattern; that race-conditioned with the cleanup.
+ */
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
 import { useSocket } from "@/lib/hooks/use-socket";
@@ -8,6 +30,10 @@ import { countWords } from "@/lib/utils/word-count";
 import { useTone } from "@/lib/hooks/use-tone";
 
 const MIN_WORDS = 15;
+// Mirrors server `env.MAX_ARGUMENT_WORDS` (default 800). The socket
+// handler rejects anything over this with a `max_words` error event;
+// pre-validating here disables submit before the user even tries.
+const MAX_WORDS = 800;
 const TYPING_DEBOUNCE_MS = 800;
 const TYPING_INACTIVE_MS = 2500;
 
@@ -23,19 +49,52 @@ export function Composer({
   const socket = useSocket();
   const { t } = useTone();
   const [text, setText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // `lastSubmitted` lets the error handler restore the user's text if
+  // the server rejects. We hold it in a ref so the listener (mounted
+  // once) always sees the freshest pending payload.
+  const lastSubmittedRef = useRef<string>("");
   const wc = countWords(text);
   const isMyTurn = state?.current_turn_user_id === viewerId;
   const isParticipant =
     state?.player1?.id === viewerId || state?.player2?.id === viewerId;
-  if (!isParticipant) return null;
+
+  // Single, mount-stable error listener. Restores text on rejection so
+  // the user can fix + retry.
+  useEffect(() => {
+    if (!isParticipant) return;
+    const onError = (e: { human?: string; message?: string }) => {
+      // Only the submission-related error codes restore text. Other
+      // server errors (rate_limited on typing, etc.) shouldn't repop
+      // the textarea.
+      const restoreCodes = new Set([
+        "min_words",
+        "max_words",
+        "max_bytes",
+        "not_your_turn",
+        "still_in_prep",
+        "invalid_submission",
+        "rate_limited",
+        "unauthenticated",
+      ]);
+      const code = e.message ?? "";
+      if (lastSubmittedRef.current && restoreCodes.has(code)) {
+        setText(lastSubmittedRef.current);
+        lastSubmittedRef.current = "";
+      }
+      setErrorMsg(e.human ?? (code || "Submission failed"));
+    };
+    socket.on("error", onError);
+    return () => {
+      socket.off("error", onError);
+    };
+  }, [socket, isParticipant]);
 
   // Typing throttle: 800ms debounce between active emits, 2500ms idle
   // timer fires `active:false`. Matches static/js/debate.js.
   useEffect(() => {
     if (!isMyTurn || text.length === 0) return;
-    const t = setTimeout(() => {
+    const debounce = setTimeout(() => {
       socket.emit("typing", {
         debate_id: debateId,
         word_count: wc,
@@ -50,41 +109,38 @@ export function Composer({
       });
     }, TYPING_INACTIVE_MS);
     return () => {
-      clearTimeout(t);
+      clearTimeout(debounce);
       clearTimeout(idle);
     };
   }, [text, isMyTurn, socket, debateId, wc]);
 
-  const submit = async () => {
-    if (!isMyTurn || submitting) return;
+  if (!isParticipant) return null;
+
+  const submit = () => {
+    if (!isMyTurn) return;
     if (wc < MIN_WORDS) {
       setErrorMsg(`Need at least ${MIN_WORDS} words — you have ${wc}.`);
       return;
     }
-    setSubmitting(true);
+    if (wc > MAX_WORDS) {
+      setErrorMsg(
+        `Argument too long — keep it under ${MAX_WORDS} words (${wc} now).`,
+      );
+      return;
+    }
+    const payload = text;
+    lastSubmittedRef.current = payload;
     setErrorMsg(null);
     socket.emit("submit_argument", {
       debate_id: debateId,
-      content: text,
+      content: payload,
     });
-    // The server will broadcast `argument_posted` + `debate_state`. We
-    // clear locally on success via a one-shot listener.
-    const onArgPosted = (m: { author_username: string }) => {
-      if (state?.player1?.username === m.author_username || state?.player2?.username === m.author_username) {
-        setText("");
-        setSubmitting(false);
-        socket.off("argument_posted", onArgPosted);
-        socket.off("error", onError);
-      }
-    };
-    const onError = (e: { human?: string; message?: string }) => {
-      setSubmitting(false);
-      setErrorMsg(e.human ?? e.message ?? "Submission failed");
-      socket.off("argument_posted", onArgPosted);
-      socket.off("error", onError);
-    };
-    socket.on("argument_posted", onArgPosted);
-    socket.once("error", onError);
+    // Optimistic: clear the textarea immediately so the user sees the
+    // submit landed. The new message will appear in MessagesList via
+    // the DebateRoom's `argument_posted` listener within milliseconds.
+    // If the server rejects, the always-mounted error listener above
+    // restores the text.
+    setText("");
   };
 
   return (
@@ -93,7 +149,18 @@ export function Composer({
         <span className={isMyTurn ? "text-red" : "text-sepia"}>
           {isMyTurn ? t("header_your_turn") : t("header_waiting")}
         </span>
-        <span className="text-sepia">{wc} words</span>
+        <span
+          className={
+            wc > MAX_WORDS
+              ? "text-red"
+              : wc >= MIN_WORDS
+                ? "text-ink"
+                : "text-sepia"
+          }
+        >
+          {wc} / {MAX_WORDS} words
+          {wc < MIN_WORDS ? ` · min ${MIN_WORDS}` : null}
+        </span>
       </div>
       <textarea
         value={text}
@@ -116,11 +183,11 @@ export function Composer({
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          disabled={!isMyTurn || submitting || wc < MIN_WORDS}
+          disabled={!isMyTurn || wc < MIN_WORDS || wc > MAX_WORDS}
           onClick={submit}
           className="rounded bg-red px-4 py-2 font-condensed text-sm uppercase tracking-widest text-paper shadow-press hover:translate-x-px hover:translate-y-px hover:shadow-press-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Submitting…" : t("composer_submit")}
+          {t("composer_submit")}
         </button>
       </div>
     </section>

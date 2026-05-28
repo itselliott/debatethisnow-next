@@ -83,6 +83,25 @@ export function useChallengeInbox() {
 }
 
 /**
+ * Live matchmaking queue size — drives the "▶ N waiting" pill on the
+ * Start New Debate / Random Match CTA tiles. Refetches every 15s as a
+ * fallback; the dashboard's socket invalidator also kicks it whenever
+ * a `match_found` fires (the queue drops by 2 when a pair is made).
+ */
+export function useQueueSize() {
+  return useQuery({
+    queryKey: ["dashboard", "queue-size"],
+    queryFn: ({ signal }) =>
+      apiClient.get<{ queue_size: number; in_queue: boolean }>(
+        "/api/matchmaking/queue",
+        signal,
+      ),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
+}
+
+/**
  * Socket-driven invalidator. Mounts once per dashboard surface and
  * subscribes to the events that should refresh one or more cached lists.
  * This is the "headline win" from the parity matrix — UI updates instantly
@@ -95,6 +114,8 @@ export function useDashboardLiveRefresh(): void {
     const onMatchFound = () => {
       qc.invalidateQueries({ queryKey: ["dashboard", "my-active"] });
       qc.invalidateQueries({ queryKey: ["dashboard", "active-debates"] });
+      // Queue drops by 2 on a match — refresh the "N waiting" pill.
+      qc.invalidateQueries({ queryKey: ["dashboard", "queue-size"] });
     };
     const onChallenge = () => {
       qc.invalidateQueries({ queryKey: ["dashboard", "challenges-inbox"] });

@@ -8,6 +8,7 @@ import {
   useDashboardLiveRefresh,
   useMyActiveDebates,
   useMyPastDebates,
+  useQueueSize,
   useTrendingTopics,
 } from "@/lib/hooks/use-dashboard";
 import { apiClient } from "@/lib/api-client";
@@ -221,24 +222,37 @@ function ChallengesCard({
 
 function CtaTiles() {
   const { t } = useTone();
+  // Live queue size — pulled here so the two matchmaking tiles can
+  // both surface it. Refreshes every 15s via TanStack staleTime; also
+  // gets bumped by the socket `match_found` invalidator in
+  // useDashboardLiveRefresh.
+  const queue = useQueueSize();
+  const size = queue.data?.queue_size ?? 0;
+
   return (
     <section className="grid gap-4 sm:grid-cols-3">
       <Link
         href="/matchmaking"
-        className="rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
+        className="relative rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
       >
-        <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-          Start
+        <div className="flex items-center justify-between">
+          <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
+            Start
+          </div>
+          <QueueBadge size={size} />
         </div>
         <h3 className="mt-1 font-display text-xl">{t("cta_start")}</h3>
         <p className="mt-2 text-sm text-sepia">{t("cta_start_sub")}</p>
       </Link>
       <Link
         href="/matchmaking?random=1"
-        className="rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
+        className="relative rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
       >
-        <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-          Random
+        <div className="flex items-center justify-between">
+          <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
+            Random
+          </div>
+          <QueueBadge size={size} />
         </div>
         <h3 className="mt-1 font-display text-xl">{t("cta_random")}</h3>
         <p className="mt-2 text-sm text-sepia">{t("cta_random_sub")}</p>
@@ -254,6 +268,19 @@ function CtaTiles() {
         <p className="mt-2 text-sm text-sepia">{t("cta_showcase_sub")}</p>
       </Link>
     </section>
+  );
+}
+
+function QueueBadge({ size }: { size: number }) {
+  if (size <= 0) return null;
+  return (
+    <span className="flex items-center gap-1 rounded-full bg-red px-2 py-0.5 font-condensed text-[10px] uppercase tracking-wider text-paper">
+      <span
+        aria-hidden
+        className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-paper"
+      />
+      {size} waiting
+    </span>
   );
 }
 

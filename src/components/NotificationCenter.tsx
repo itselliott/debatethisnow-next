@@ -268,8 +268,16 @@ function formatBody(n: NotificationDict): string {
 function ctaHref(n: NotificationDict): string | null {
   const p = n.payload;
   switch (n.kind) {
-    case "challenge_received":
+    // All friend-relationship notifications route to /friends — that's
+    // where incoming requests are accepted/declined and the list of
+    // current friends lives. Sending the user to /dashboard for a
+    // friend_request was wrong; the dashboard doesn't surface a way to
+    // act on it.
     case "friend_request":
+    case "friend_accepted":
+    case "friend_declined":
+      return "/friends";
+    case "challenge_received":
       return "/dashboard";
     case "challenge_accepted": {
       const id = pickNumber(p, "debate_id");
@@ -284,9 +292,6 @@ function ctaHref(n: NotificationDict): string | null {
       const id = pickNumber(p, "debate_id");
       return id !== null ? `/results/${id}` : null;
     }
-    case "friend_accepted":
-    case "friend_declined":
-      return "/friends";
     case "rematch_offered":
     case "series_invite":
       return "/dashboard";
