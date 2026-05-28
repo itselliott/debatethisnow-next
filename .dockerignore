@@ -1,0 +1,28 @@
+# Don't bloat the build context.
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# Dev artifacts
+.vscode
+.idea
+*.tsbuildinfo
+coverage
+tests
+playwright.config.ts
+vitest.config.ts
+scripts
+
+# Docs — included in source-control but not in the runtime image
+MIGRATION_PARITY.md
+MIGRATION_UI_INVENTORY.md
+DEPLOY.md
+README.md
+CLAUDE.md
+AGENTS.md

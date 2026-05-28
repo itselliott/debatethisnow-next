@@ -1,0 +1,56 @@
+# Fly.io app config for the Next.js port. Mirrors the Python app's
+# fly.toml except for the app name + memory bump.
+#
+# Edit `app` to match the Fly app you created with `fly apps create`.
+# For the parity-test window, the staging app is `debatethisnow-next`
+# bound to `next.debatethisnow.com`. Once cutover happens, repoint the
+# `debatethisnow` Fly app at this Docker image (or scale this app up +
+# rotate DNS — see DEPLOY.md).
+
+app = 'debatethisnow-next'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  strategy = 'rolling'
+
+[env]
+  # Defaults that don't need to be secrets. Real secret values
+  # (DATABASE_URL, JWT_SECRET_KEY, SECRET_KEY, OAuth creds, LLM keys)
+  # are set via `fly secrets set`.
+  NODE_ENV = 'production'
+  HOSTNAME = '0.0.0.0'
+  PORT = '8080'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = false
+  min_machines_running = 1
+  max_machines_running = 1
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 250
+    soft_limit = 200
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '20s'
+    method = 'GET'
+    path = '/healthz'
+
+[[vm]]
+  # Bump from the Python app's 512MB. Node + Prisma client + Socket.IO
+  # sit a bit heavier in resident memory; 1GB leaves headroom for spiky
+  # debate-room broadcasts without OOM risk.
+  size = 'shared-cpu-1x'
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Design tokens — WPA poster palette + letterpress shadows from the
+ * existing main.css. Source of truth: MIGRATION_UI_INVENTORY.md §
+ * "CSS — main.css".
+ *
+ * Tailwind 4 reads these via `@theme inline`, exposing them as
+ * `bg-paper`, `text-ink`, `font-display` utilities.
+ */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Paper / ink — vintage WPA */
+  --color-paper: #f1e6c8;
+  --color-paper-2: #f7eed4;
+  --color-paper-3: #e6d8b0;
+  --color-paper-4: #d8c692;
+  --color-ink: #182846;
+  --color-ink-soft: #2a3f63;
+  --color-sepia: #6b5a36;
+  --color-muted-ink: #8a7649;
+
+  /* Action colors */
+  --color-red: #c4282e;
+  --color-red-dark: #9a1e23;
+  --color-gold: #d4a017;
+  --color-gold-dark: #a87f10;
+  --color-navy: #182846;
+  --color-green-action: #4a7c3a;
+
+  /* Semantic aliases used in main.css */
+  --color-bg: var(--color-paper);
+  --color-text: var(--color-ink);
+
+  /* Fonts */
+  --font-display: var(--font-bevan), "Playfair Display", Georgia, serif;
+  --font-condensed: var(--font-oswald), "Arial Narrow", sans-serif;
+  --font-body: var(--font-lora), Georgia, serif;
+  --font-mono: var(--font-special-elite), "Courier New", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
+/*
+ * Base styles + halftone-overlay decoration. Mirrors the body::before
+ * trick from main.css that adds the aged-paper texture site-wide.
+ */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: light;
+  }
+
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.5;
+    overflow-x: hidden;
+    position: relative;
+    z-index: 0;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(rgba(24, 40, 70, 0.07) 1px, transparent 1px);
+    background-size: 14px 14px;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Reserve `[hidden]` as a hard hide — matches main.css's
+   * `display: none !important` rule. Several places in the original
+   * client toggle `[hidden]` to swap between flex/grid layouts. */
+  [hidden] {
+    display: none !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/*
+ * Letterpress utilities. Nearly every interactive surface in the original
+ * app uses these solid offset shadows; expose them as Tailwind utilities so
+ * components stay declarative.
+ */
+@layer utilities {
+  .shadow-press {
+    box-shadow: 4px 4px 0 var(--color-ink);
+  }
+  .shadow-press-sm {
+    box-shadow: 2px 2px 0 var(--color-ink);
+  }
+  .shadow-press-lg {
+    box-shadow: 8px 8px 0 var(--color-ink);
+  }
+
+  /* Decorative top stripe (candy stripe) — used on panels + modal tops. */
+  .bg-stripe-candy {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--color-red) 0 8px,
+      var(--color-paper-3) 8px 16px
+    );
+  }
+
+  /* Auth-card top bunting (red/paper/navy/paper). */
+  .bg-stripe-bunting {
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--color-red) 0 16px,
+      var(--color-paper-3) 16px 32px,
+      var(--color-navy) 32px 48px,
+      var(--color-paper-3) 48px 64px
+    );
+  }
 }

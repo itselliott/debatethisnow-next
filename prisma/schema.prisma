@@ -1,0 +1,435 @@
+// Prisma schema — hand-authored to mirror the existing Python/SQLAlchemy
+// models exactly. This is the SAME schema the live Neon database carries
+// today; `prisma db pull` against `DATABASE_URL` should produce an
+// equivalent file (modulo Prisma's `db pull` formatting quirks).
+//
+// Source of truth for column names + types: C:\Repo\debatethis\app\models\
+// Documented at: ../MIGRATION_PARITY.md § 1 (Database schema → Prisma model mapping)
+//
+// Authoring rules (do not violate):
+//   1. Table names match Python exactly via @@map.
+//   2. Column names stay snake_case to preserve JSON shapes returned by API
+//      routes — the existing Python app emits snake_case, and master_test.py
+//      / the JS client both expect it. Mapping to camelCase would force a
+//      translation layer on every API response.
+//   3. Indexes + UniqueConstraints match Python @ models.* declarations.
+//   4. Postgres types match: BigInt for notification/audit_event ids,
+//      Json (JSONB on PG) for payload/data/event_metadata.
+//   5. The audit_events column is named `metadata` in the DB but is exposed
+//      as `event_metadata` in the model — preserve via @map.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// users — root of the social graph
+// ============================================================================
+model User {
+  id                    Int       @id @default(autoincrement())
+  username              String    @unique @db.VarChar(32)
+  email                 String    @unique @db.VarChar(255)
+  password_hash         String    @db.VarChar(255)
+  elo_rating            Int       @default(1000)
+  wins                  Int       @default(0)
+  losses                Int       @default(0)
+  debates_completed     Int       @default(0)
+  avatar                String?   @default("default") @db.VarChar(255)
+  rank_tier             String?   @default("Unranked") @db.VarChar(32)
+  online_status         String?   @default("offline") @db.VarChar(16)
+  is_admin              Boolean   @default(false)
+  is_banned             Boolean   @default(false)
+  is_bot                Boolean   @default(false)
+  owner_id              Int?
+  api_key               String?   @unique @db.VarChar(64)
+  bot_description       String?   @db.VarChar(280)
+  created_at            DateTime  @default(now())
+  last_seen_at          DateTime? @default(now())
+  // JSON-encoded list of ISO timestamps tracking username changes;
+  // see [app/models/user.py:64-69] and the 3-changes-per-365d rule.
+  username_changes      String    @default("") @db.VarChar(512)
+
+  // Self-reference for bot ownership.
+  owner                 User?     @relation("BotOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  owned_bots            User[]    @relation("BotOwner")
+
+  stats                 UserStats?
+  settings              UserSettings?
+  debates_as_p1         Debate[]  @relation("DebateP1")
+  debates_as_p2         Debate[]  @relation("DebateP2")
+  debates_won           Debate[]  @relation("DebateWinner")
+  debates_turn          Debate[]  @relation("DebateCurrentTurn")
+  debate_results_won    DebateResult[] @relation("ResultWinner")
+  debate_results_lost   DebateResult[] @relation("ResultLoser")
+  debate_messages       DebateMessage[]
+  debate_votes_cast     DebateVote[]   @relation("VoteVoter")
+  debate_votes_for      DebateVote[]   @relation("VoteFor")
+  matchmaking_entry     MatchmakingQueue?
+  notifications         Notification[]
+  achievements          UserAchievement[]
+  reports_filed         Report[]   @relation("ReporterRel")
+  reports_against       Report[]   @relation("TargetRel")
+  challenges_sent       Challenge[] @relation("Challenger")
+  challenges_received   Challenge[] @relation("ChallengeTarget")
+  friendships_outgoing  Friendship[] @relation("Requester")
+  friendships_incoming  Friendship[] @relation("FriendTarget")
+  blocks_made           UserBlock[] @relation("Blocker")
+  blocks_against        UserBlock[] @relation("Blocked")
+  audit_events_actor    AuditEvent[] @relation("AuditActor")
+
+  @@index([username])
+  @@index([email])
+  @@index([is_bot])
+  @@index([api_key])
+  @@map("users")
+}
+
+// ============================================================================
+// debates — central entity
+// ============================================================================
+model Debate {
+  id                    Int       @id @default(autoincrement())
+  topic                 String    @db.VarChar(255)
+  category              String?   @default("Society") @db.VarChar(64)
+  status                String    @default("pending") @db.VarChar(32)
+  player1_id            Int?
+  player2_id            Int?
+  winner_id             Int?
+  side_player1          String?   @default("FOR") @db.VarChar(16)
+  side_player2          String?   @default("AGAINST") @db.VarChar(16)
+  current_round         Int?      @default(0)
+  current_turn_user_id  Int?
+  phase                 String?   @default("opening") @db.VarChar(32)
+  is_prep               Boolean   @default(false)
+  turn_started_at       DateTime?
+  turn_deadline         DateTime?
+  score_player1         Float?    @default(0)
+  score_player2         Float?    @default(0)
+  ai_score_player1      Float?    @default(0)
+  ai_score_player2      Float?    @default(0)
+  votes_player1         Int?      @default(0)
+  votes_player2         Int?      @default(0)
+  elo_delta_player1     Int?      @default(0)
+  elo_delta_player2     Int?      @default(0)
+  created_at            DateTime  @default(now())
+  started_at            DateTime?
+  completed_at          DateTime?
+
+  player1               User?     @relation("DebateP1", fields: [player1_id], references: [id], onDelete: SetNull)
+  player2               User?     @relation("DebateP2", fields: [player2_id], references: [id], onDelete: SetNull)
+  winner                User?     @relation("DebateWinner", fields: [winner_id], references: [id], onDelete: SetNull)
+  current_turn_user     User?     @relation("DebateCurrentTurn", fields: [current_turn_user_id], references: [id], onDelete: SetNull)
+  messages              DebateMessage[]
+  result                DebateResult?
+  votes                 DebateVote[]
+  challenges            Challenge[]
+  user_achievements     UserAchievement[]
+
+  @@index([status])
+  @@index([player1_id])
+  @@index([player2_id])
+  @@map("debates")
+}
+
+// ============================================================================
+// debate_messages — per-turn arguments
+// ============================================================================
+model DebateMessage {
+  id            Int       @id @default(autoincrement())
+  debate_id     Int
+  author_id     Int?
+  round_number  Int
+  phase         String    @db.VarChar(32)
+  content       String    @db.Text
+  word_count    Int       @default(0)
+  created_at    DateTime  @default(now())
+
+  debate        Debate    @relation(fields: [debate_id], references: [id], onDelete: Cascade)
+  author        User?     @relation(fields: [author_id], references: [id], onDelete: SetNull)
+  reports       Report[]
+
+  @@index([debate_id])
+  @@map("debate_messages")
+}
+
+// ============================================================================
+// debate_votes — audience votes, with IP-hash sockpuppet dedup
+// ============================================================================
+model DebateVote {
+  id              Int       @id @default(autoincrement())
+  debate_id       Int
+  voter_id        Int
+  vote_for        Int?
+  voter_ip_hash   String?   @db.VarChar(64)
+  created_at      DateTime  @default(now())
+
+  debate          Debate    @relation(fields: [debate_id], references: [id], onDelete: Cascade)
+  voter           User      @relation("VoteVoter", fields: [voter_id], references: [id], onDelete: Cascade)
+  vote_target     User?     @relation("VoteFor", fields: [vote_for], references: [id], onDelete: SetNull)
+
+  @@unique([debate_id, voter_id], name: "uq_debate_vote_unique")
+  @@index([debate_id])
+  @@index([voter_id])
+  @@index([voter_ip_hash])
+  @@map("debate_votes")
+}
+
+// ============================================================================
+// debate_results — final scored snapshot per completed debate
+// ============================================================================
+model DebateResult {
+  id                    Int      @id @default(autoincrement())
+  debate_id             Int      @unique
+  winner_id             Int?
+  loser_id              Int?
+  final_score_player1   Float?   @default(0)
+  final_score_player2   Float?   @default(0)
+  ai_score_player1      Float?   @default(0)
+  ai_score_player2      Float?   @default(0)
+  votes_player1         Int?     @default(0)
+  votes_player2         Int?     @default(0)
+  elo_change_winner     Int?     @default(0)
+  elo_change_loser      Int?     @default(0)
+  summary               String?  @db.Text
+  created_at            DateTime @default(now())
+
+  debate                Debate   @relation(fields: [debate_id], references: [id], onDelete: Cascade)
+  winner                User?    @relation("ResultWinner", fields: [winner_id], references: [id], onDelete: SetNull)
+  loser                 User?    @relation("ResultLoser", fields: [loser_id], references: [id], onDelete: SetNull)
+
+  @@map("debate_results")
+}
+
+// ============================================================================
+// matchmaking_queue — one row per actively-queued user
+// ============================================================================
+model MatchmakingQueue {
+  id                   Int      @id @default(autoincrement())
+  user_id              Int      @unique
+  preferred_topic      String?  @db.VarChar(255)
+  preferred_category   String?  @db.VarChar(64)
+  elo_snapshot         Int?     @default(1000)
+  socket_sid           String?  @db.VarChar(64)
+  joined_at            DateTime @default(now())
+
+  user                 User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("matchmaking_queue")
+}
+
+// ============================================================================
+// user_stats — extended per-user numbers
+// ============================================================================
+model UserStats {
+  id                       Int      @id @default(autoincrement())
+  user_id                  Int      @unique
+  peak_elo                 Int?     @default(1000)
+  avg_words_per_argument   Float?   @default(0)
+  longest_win_streak       Int?     @default(0)
+  current_streak           Int?     @default(0)
+  total_arguments          Int?     @default(0)
+  total_audience_votes     Int?     @default(0)
+  favorite_category        String?  @db.VarChar(64)
+  updated_at               DateTime @default(now()) @updatedAt
+
+  user                     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_stats")
+}
+
+// ============================================================================
+// app_settings — generic global KV store
+// (bot_model, llm_scorer_enabled, llm_scorer_model, daily_topic, etc.)
+// ============================================================================
+model AppSetting {
+  key         String   @id @db.VarChar(64)
+  value       String?  @db.Text
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@map("app_settings")
+}
+
+// ============================================================================
+// achievements — static catalog of unlockable badges
+// ============================================================================
+model Achievement {
+  code         String  @id @db.VarChar(48)
+  name         String  @db.VarChar(64)
+  description  String  @db.VarChar(255)
+  icon         String? @default("★") @db.VarChar(8)
+  tier         String? @default("bronze") @db.VarChar(16)
+
+  user_awards  UserAchievement[]
+
+  @@map("achievements")
+}
+
+// ============================================================================
+// user_achievements — earned badges
+// ============================================================================
+model UserAchievement {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  code        String   @db.VarChar(48)
+  awarded_at  DateTime @default(now())
+  debate_id   Int?
+
+  user         User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  achievement  Achievement @relation(fields: [code], references: [code], onDelete: Cascade)
+  debate       Debate?     @relation(fields: [debate_id], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, code], name: "uq_user_achievement")
+  @@index([user_id])
+  @@map("user_achievements")
+}
+
+// ============================================================================
+// reports — user-submitted reports on debate messages or other users
+// ============================================================================
+model Report {
+  id              Int       @id @default(autoincrement())
+  reporter_id     Int?
+  target_user_id  Int?
+  debate_id       Int?
+  message_id      Int?
+  reason          String?   @default("other") @db.VarChar(32)
+  note            String?   @db.Text
+  status          String    @default("pending") @db.VarChar(16)
+  created_at      DateTime  @default(now())
+  resolved_at     DateTime?
+
+  reporter        User?           @relation("ReporterRel", fields: [reporter_id], references: [id], onDelete: SetNull)
+  target          User?           @relation("TargetRel", fields: [target_user_id], references: [id], onDelete: SetNull)
+  message         DebateMessage?  @relation(fields: [message_id], references: [id], onDelete: SetNull)
+
+  @@index([reporter_id])
+  @@index([target_user_id])
+  @@index([status])
+  @@map("reports")
+}
+
+// ============================================================================
+// challenges — direct user-to-user debate invitations
+// ============================================================================
+model Challenge {
+  id              Int       @id @default(autoincrement())
+  challenger_id   Int
+  target_id       Int
+  topic           String    @db.VarChar(255)
+  category        String?   @default("Society") @db.VarChar(64)
+  note            String?   @db.Text
+  status          String    @default("pending") @db.VarChar(16)
+  debate_id       Int?
+  created_at      DateTime  @default(now())
+  expires_at      DateTime?
+  accepted_at     DateTime?
+
+  challenger      User      @relation("Challenger", fields: [challenger_id], references: [id], onDelete: Cascade)
+  target          User      @relation("ChallengeTarget", fields: [target_id], references: [id], onDelete: Cascade)
+  debate          Debate?   @relation(fields: [debate_id], references: [id], onDelete: SetNull)
+
+  @@index([challenger_id])
+  @@index([target_id])
+  @@index([status])
+  @@map("challenges")
+}
+
+// ============================================================================
+// friendships — single row represents both directions when accepted
+// ============================================================================
+model Friendship {
+  id            Int       @id @default(autoincrement())
+  requester_id  Int
+  target_id     Int
+  status        String    @default("pending") @db.VarChar(16)
+  created_at    DateTime  @default(now())
+  accepted_at   DateTime?
+
+  requester     User      @relation("Requester", fields: [requester_id], references: [id], onDelete: Cascade)
+  target        User      @relation("FriendTarget", fields: [target_id], references: [id], onDelete: Cascade)
+
+  @@unique([requester_id, target_id], name: "uq_friendships_pair")
+  @@index([requester_id])
+  @@index([target_id])
+  @@index([status])
+  @@map("friendships")
+}
+
+// ============================================================================
+// notifications — unified in-app + (future) push + (future) email inbox
+// ============================================================================
+model Notification {
+  id          BigInt    @id @default(autoincrement())
+  user_id     Int
+  kind        String    @db.VarChar(64)
+  // JSONB on Postgres — Prisma's Json type maps to JSONB by default on PG.
+  payload     Json      @default("{}")
+  read_at     DateTime?
+  created_at  DateTime  @default(now())
+
+  user        User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, read_at, created_at], name: "ix_notifications_user_unread")
+  @@index([created_at])
+  @@map("notifications")
+}
+
+// ============================================================================
+// user_settings — per-user JSONB prefs blob
+// ============================================================================
+model UserSettings {
+  user_id     Int      @id
+  data        Json     @default("{}")
+  updated_at  DateTime @default(now()) @updatedAt
+
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+// ============================================================================
+// user_blocks — one-way storage, two-way enforcement
+// ============================================================================
+model UserBlock {
+  blocker_id  Int
+  blocked_id  Int
+  created_at  DateTime @default(now())
+
+  blocker     User     @relation("Blocker", fields: [blocker_id], references: [id], onDelete: Cascade)
+  blocked     User     @relation("Blocked", fields: [blocked_id], references: [id], onDelete: Cascade)
+
+  @@id([blocker_id, blocked_id])
+  @@index([blocked_id], name: "ix_user_blocks_blocked_id")
+  @@map("user_blocks")
+}
+
+// ============================================================================
+// audit_events — append-only security log
+// (column name `metadata` in DB, exposed as `event_metadata` in code via @map
+// to keep `metadata` available as a Prisma model option)
+// ============================================================================
+model AuditEvent {
+  id              BigInt    @id @default(autoincrement())
+  actor_id        Int?
+  kind            String    @db.VarChar(64)
+  target_id       BigInt?
+  event_metadata  Json      @default("{}") @map("metadata")
+  // INET on Postgres in Python; Prisma doesn't have a first-class INET type
+  // so we keep this as VarChar. Going forward the ip column is NULL and the
+  // salted ip_hash lives in event_metadata.ip_hash.
+  ip              String?   @db.VarChar(64)
+  user_agent      String?   @db.VarChar(256)
+  created_at      DateTime  @default(now())
+
+  actor           User?     @relation("AuditActor", fields: [actor_id], references: [id], onDelete: SetNull)
+
+  @@index([kind, created_at], name: "ix_audit_events_kind_created")
+  @@index([actor_id, created_at], name: "ix_audit_events_actor_created")
+  @@map("audit_events")
+}

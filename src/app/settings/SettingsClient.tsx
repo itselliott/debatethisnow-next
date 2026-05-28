@@ -1,0 +1,133 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiClient, ApiError } from "@/lib/api-client";
+
+const LANGUAGES = [
+  { code: "en", label: "English", flag: "🇺🇸" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+];
+const LANG_KEY = "debatethis.lang";
+
+export function SettingsClient({
+  username,
+  isAdmin,
+}: {
+  username: string;
+  isAdmin: boolean;
+}) {
+  const router = useRouter();
+  const [lang, setLang] = useState<string>("en");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  void isAdmin;
+
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem(LANG_KEY);
+      if (v) setLang(v);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const setLanguage = (code: string) => {
+    setLang(code);
+    try {
+      window.localStorage.setItem(LANG_KEY, code);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const deleteAccount = async () => {
+    setError(null);
+    if (!password) {
+      setError("Enter your password to confirm.");
+      return;
+    }
+    if (
+      !window.confirm(
+        "This permanently scrubs your account. You will be signed out and the username freed. Continue?",
+      )
+    ) {
+      return;
+    }
+    try {
+      await apiClient.delete("/api/auth/me", { password });
+      router.push("/");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(
+          err.status === 400
+            ? "Password didn't match. Try again."
+            : err.message,
+        );
+      } else {
+        setError("Unable to delete account.");
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <header className="border-b-[3px] border-double border-ink pb-4">
+        <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
+          Account
+        </span>
+        <h1 className="mt-1 font-display text-3xl">Settings</h1>
+        <p className="text-sm text-sepia">Signed in as {username}.</p>
+      </header>
+
+      <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
+        <h2 className="font-display text-lg">Language</h2>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => setLanguage(l.code)}
+              className={`rounded border-2 ${lang === l.code ? "border-red bg-red text-paper" : "border-ink bg-paper text-ink"} px-3 py-2 font-condensed text-sm uppercase tracking-wider`}
+            >
+              {l.flag} {l.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded border border-red bg-paper-2 p-4 shadow-press">
+        <h2 className="font-display text-lg text-red">Danger zone</h2>
+        <p className="mt-1 text-sm text-sepia">
+          Deleting your account scrubs PII and frees the username, but
+          preserves past debate transcripts so opponents' records stay
+          coherent.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Confirm password"
+            className="flex-1 rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm focus:outline-none focus:ring-2 focus:ring-red"
+          />
+          <button
+            type="button"
+            onClick={deleteAccount}
+            className="rounded bg-red px-4 py-2 font-condensed text-sm uppercase tracking-widest text-paper shadow-press-sm hover:opacity-90"
+          >
+            Delete Account
+          </button>
+        </div>
+        {error ? (
+          <div
+            role="alert"
+            className="mt-2 rounded border border-red bg-red/10 px-3 py-2 text-sm text-red-dark"
+          >
+            {error}
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
