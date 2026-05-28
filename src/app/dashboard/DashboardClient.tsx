@@ -31,11 +31,14 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
   const myPast = useMyPastDebates();
   void username;
 
-  const resumeDebate = (myActive.data?.debates ?? [])[0];
+  // The dashboard used to render its own "Resume Debate" banner here.
+  // That surface moved to AppShell so the banner appears on every authed
+  // page — a user who left a debate to read the blog or check rankings
+  // can resume in one click without going back to /dashboard first.
+  void myActive;
 
   return (
     <div className="space-y-6">
-      {resumeDebate ? <ResumeBanner debate={resumeDebate} /> : null}
       {daily.data?.daily ? <DailyTopicCard topic={daily.data.daily} /> : null}
       {(challenges.data?.challenges ?? []).length > 0 ? (
         <ChallengesCard
@@ -110,26 +113,6 @@ function Panel({
       <h2 className="mb-3 font-display text-xl">{title}</h2>
       {children}
     </section>
-  );
-}
-
-function ResumeBanner({ debate }: { debate: DebateDict }) {
-  return (
-    <Link
-      href={`/debate/${debate.id}`}
-      className="block rounded border-2 border-red bg-paper-2 p-4 shadow-press"
-    >
-      <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-        ▶ Debate in Progress
-      </span>
-      <div className="mt-1 font-display text-xl text-ink">{debate.topic}</div>
-      <div className="mt-1 text-sm text-sepia">
-        Round {debate.current_round ?? "—"} · {debate.status}
-      </div>
-      <span className="mt-2 inline-block rounded bg-red px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper">
-        Resume
-      </span>
-    </Link>
   );
 }
 

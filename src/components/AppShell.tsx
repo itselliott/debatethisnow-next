@@ -19,6 +19,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SoundAmbience } from "@/components/SoundAmbience";
+import { ResumeDebateBanner } from "@/components/ResumeDebateBanner";
 import { useSidebarCollapsed } from "@/lib/hooks/use-sidebar";
 import { useTone } from "@/lib/hooks/use-tone";
 
@@ -70,7 +71,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           id="main-content"
           className="relative z-10 min-w-0 flex-1 p-4 pb-20 sm:p-6 md:p-9 md:pb-9 md:px-11"
         >
-          <div className="mx-auto max-w-[1400px]">{children}</div>
+          <div className="mx-auto max-w-[1400px]">
+            <ResumeDebateBanner />
+            {children}
+          </div>
         </main>
       </div>
 
