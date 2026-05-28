@@ -1,16 +1,18 @@
 "use client";
 
 /**
- * Sidebar — fixed 240px column with the brand mark, primary nav, and the
- * user-mini footer. Mirrors `app/templates/base.html`'s left rail.
+ * Sidebar aside. AppShell decides whether this component renders at all
+ * — when collapsed, AppShell unmounts it and shows the floating expand
+ * button. So this file is purely the visible 240px rail.
  *
- * Mobile (below md): hidden entirely; primary nav lives in the
- * MobileBottomNav component. Desktop: 240px column, collapsible via the
- * chevron inside its header. When collapsed, a floating menu icon
- * appears top-left to expand. The toggle is NEVER positioned over the
- * main content area — caught + fixed by user testing.
+ * Mobile (below md): hidden via `hidden md:flex`. Primary nav lives in
+ * MobileBottomNav.
+ *
+ * The collapse chevron in the header calls back to AppShell via the
+ * `onCollapse` prop. State is owned by `useSidebarCollapsed()`, which
+ * AppShell consumes — Sidebar is intentionally state-free now.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
@@ -18,8 +20,6 @@ import { useSoundToggle } from "@/lib/hooks/use-sound";
 import { useTone } from "@/lib/hooks/use-tone";
 import type { PhraseKey } from "@/lib/tone/phrases";
 import { NotificationCenter } from "@/components/NotificationCenter";
-
-const SIDEBAR_KEY = "debatethis.sidebarCollapsed";
 
 interface NavLink {
   href: string;
@@ -44,115 +44,66 @@ function isActive(currentPath: string, href: string): boolean {
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-export function Sidebar() {
+export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   const pathname = usePathname();
   const { t } = useTone();
-  const [collapsed, setCollapsed] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(SIDEBAR_KEY);
-      if (stored === "1") setCollapsed(true);
-    } catch {
-      /* localStorage disabled — ignore */
-    }
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    const shell = document.querySelector(".app-shell");
-    if (shell instanceof HTMLElement) {
-      shell.dataset.collapsed = collapsed ? "true" : "false";
-    }
-  }, [collapsed, hydrated]);
-
-  const toggle = useCallback(() => {
-    setCollapsed((c) => {
-      const next = !c;
-      try {
-        window.localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }, []);
 
   return (
-    <>
-      {/* Floating expand button — only when sidebar is collapsed. Hidden
-          on mobile (bottom-nav handles primary nav). NEVER positioned over
-          main content; when sidebar is open, this button doesn't render. */}
-      {collapsed ? (
+    <aside
+      id="app-sidebar"
+      aria-label="Primary"
+      // `w-[240px] shrink-0` locks the rail at 240px and stops flex from
+      // squeezing it when main content is wide. `hidden md:flex` keeps
+      // mobile clean — bottom nav handles that breakpoint.
+      className="sidebar sticky top-0 z-20 hidden h-screen w-[240px] shrink-0 flex-col gap-6 border-r-4 border-ink bg-navy px-4 py-5 text-paper md:flex"
+      style={{ boxShadow: "4px 0 0 var(--color-gold)" }}
+    >
+      {/* Header: brand + collapse chevron. Chevron lives inside the
+          sidebar so it never floats over the content area. */}
+      <div className="flex items-start justify-between gap-2">
+        <Link
+          href="/"
+          className="block font-display text-3xl leading-none tracking-tight"
+        >
+          DEBATE
+          <br />
+          THIS
+        </Link>
         <button
           type="button"
-          onClick={toggle}
-          aria-label="Open sidebar"
-          className="fixed left-3 top-3 z-50 hidden h-10 w-10 items-center justify-center rounded bg-navy text-paper shadow-press-sm md:flex"
+          onClick={onCollapse}
+          aria-label="Collapse sidebar"
+          className="rounded p-1 text-paper-3 transition-colors hover:bg-ink-soft hover:text-paper"
         >
-          <span aria-hidden className="text-xl leading-none">
-            ☰
+          <span aria-hidden className="text-lg leading-none">
+            ‹
           </span>
         </button>
-      ) : null}
+      </div>
+      <span className="-mt-4 font-condensed text-xs uppercase tracking-[0.28em] text-paper-3">
+        {t("sidebar_arena")}
+      </span>
 
-      <aside
-        id="app-sidebar"
-        aria-label="Primary"
-        className={`sidebar sticky top-0 z-20 hidden h-screen flex-col gap-6 border-r-4 border-ink bg-navy px-4 py-5 text-paper md:flex ${
-          collapsed ? "md:hidden" : ""
-        }`}
-        style={{ boxShadow: "4px 0 0 var(--color-gold)" }}
-      >
-        {/* Header: brand + collapse chevron inside the sidebar so it never
-            overlaps main content. */}
-        <div className="flex items-start justify-between gap-2">
+      <nav className="flex flex-1 flex-col gap-1">
+        {NAV_LINKS.map((link) => (
           <Link
-            href="/"
-            className="block font-display text-3xl leading-none tracking-tight"
+            key={link.href}
+            href={link.href}
+            data-route={link.href}
+            aria-current={isActive(pathname, link.href) ? "page" : undefined}
+            className={`nav-item rounded px-3 py-2 font-condensed text-sm uppercase tracking-wider transition-colors hover:bg-ink-soft ${
+              isActive(pathname, link.href)
+                ? "bg-ink-soft text-gold"
+                : "text-paper"
+            }`}
           >
-            DEBATE
-            <br />
-            THIS
+            {t(link.labelKey)}
           </Link>
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label="Collapse sidebar"
-            className="rounded p-1 text-paper-3 transition-colors hover:bg-ink-soft hover:text-paper"
-          >
-            <span aria-hidden className="text-lg leading-none">
-              ‹
-            </span>
-          </button>
-        </div>
-        <span className="-mt-4 font-condensed text-xs uppercase tracking-[0.28em] text-paper-3">
-          {t("sidebar_arena")}
-        </span>
+        ))}
+      </nav>
 
-        <nav className="flex flex-1 flex-col gap-1">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              data-route={link.href}
-              aria-current={isActive(pathname, link.href) ? "page" : undefined}
-              className={`nav-item rounded px-3 py-2 font-condensed text-sm uppercase tracking-wider transition-colors hover:bg-ink-soft ${
-                isActive(pathname, link.href)
-                  ? "bg-ink-soft text-gold"
-                  : "text-paper"
-              }`}
-            >
-              {t(link.labelKey)}
-            </Link>
-          ))}
-        </nav>
-
-        <SidebarFooter />
-      </aside>
-    </>
+      <SidebarFooter />
+    </aside>
   );
 }
 

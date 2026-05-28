@@ -23,6 +23,7 @@ let _master: GainNode | null = null;
 let _muted: boolean | null = null;
 let _lastClickAt = 0;
 let _lastKeystrokeAt = 0;
+let _lastHoverAt = 0;
 
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -99,6 +100,38 @@ export function playClick(): void {
   osc.connect(lp).connect(g).connect(_master);
   osc.start(t);
   osc.stop(t + 0.11);
+}
+
+/**
+ * Hover chime — short high-pitched bell ping. Roughly half the gain of
+ * a click and twice the pitch, so it reads as "noticed you" rather than
+ * "you clicked". Slight pitch jitter per call so a sweep across a row
+ * of cards doesn't sound robotic.
+ */
+export function playHoverChime(): void {
+  if (isMuted()) return;
+  const now = performance.now();
+  if (now - _lastHoverAt < 60) return; // anti-spam on fast cursor moves
+  _lastHoverAt = now;
+  const ctx = getCtx();
+  if (!ctx || !_master) return;
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  const base = 1200 + Math.random() * 200;
+  osc.frequency.setValueAtTime(base, t);
+  // Tiny upward pitch slide — gives it the "ping" character of a small
+  // bell rather than a flat tone.
+  osc.frequency.exponentialRampToValueAtTime(base * 1.05, t + 0.04);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  // Half the click's peak gain so a hover never feels louder than a
+  // commit.
+  g.gain.linearRampToValueAtTime(0.025, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+  osc.connect(g).connect(_master);
+  osc.start(t);
+  osc.stop(t + 0.1);
 }
 
 /**
