@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Bevan, Oswald, Lora, Special_Elite } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar/Sidebar";
 import { AppProviders } from "@/components/providers/AppProviders";
+import { AppShell } from "@/components/AppShell";
 
 const bevan = Bevan({
   variable: "--font-bevan",
@@ -49,16 +49,12 @@ export default function RootLayout({
       <body className="min-h-full">
         <AppProviders>
           {/*
-            App-shell grid: 240px sidebar + flexible main, mirroring main.css's
-            `grid-template-columns: 240px 1fr`. Sidebar collapse state is owned
-            by the Sidebar component itself (localStorage-persisted).
+            AppShell decides whether to render the sidebar grid based on
+            the current path. Public auth/landing pages (/, /login,
+            /register) skip the grid entirely so the form is centered;
+            authed pages get the 240px sidebar + main grid.
           */}
-          <div className="app-shell grid min-h-screen grid-cols-[240px_1fr] data-[collapsed=true]:grid-cols-[0_1fr]">
-            <Sidebar />
-            <main className="relative z-10 p-9 px-11 max-w-[1400px]">
-              {children}
-            </main>
-          </div>
+          <AppShell>{children}</AppShell>
         </AppProviders>
       </body>
     </html>
