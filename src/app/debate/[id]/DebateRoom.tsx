@@ -134,6 +134,32 @@ export function DebateRoom({
     store.getState().appendMessage(msg);
   });
 
+  // Streaming bubble — Groq emits deltas as the bot's argument is
+  // generated. We render an in-place placeholder that grows
+  // word-by-word. `argument_streaming_done` clears it; the persisted
+  // message arrives separately via `argument_posted`.
+  useSocketEvent<{
+    debate_id: number;
+    stream_id: string;
+    author_id: number;
+    author_username: string;
+    partial_content: string;
+  }>("argument_streaming", (payload) => {
+    store.getState().setStreaming({
+      streamId: payload.stream_id,
+      authorId: payload.author_id,
+      authorUsername: payload.author_username,
+      content: payload.partial_content,
+    });
+  });
+
+  useSocketEvent<{ debate_id: number; stream_id: string }>(
+    "argument_streaming_done",
+    () => {
+      store.getState().setStreaming(null);
+    },
+  );
+
   useSocketEvent<{
     debate_id: number;
     round: number;

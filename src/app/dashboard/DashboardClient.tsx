@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   useActiveDebates,
   useChallengeInbox,
@@ -11,6 +12,7 @@ import {
   useQueueSize,
   useTrendingTopics,
 } from "@/lib/hooks/use-dashboard";
+import { useDashboardOrder, type PanelId } from "@/lib/hooks/use-dashboard-order";
 import { apiClient } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DebateDict } from "@/lib/serializers/debate";
@@ -32,24 +34,27 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
   const myPast = useMyPastDebates();
   void username;
 
-  // The dashboard used to render its own "Resume Debate" banner here.
-  // That surface moved to AppShell so the banner appears on every authed
-  // page — a user who left a debate to read the blog or check rankings
-  // can resume in one click without going back to /dashboard first.
   void myActive;
+  const { order, move, reset } = useDashboardOrder();
+  const [customizing, setCustomizing] = useState(false);
 
-  return (
-    <div className="space-y-6">
-      {daily.data?.daily ? <DailyTopicCard topic={daily.data.daily} /> : null}
-      {(challenges.data?.challenges ?? []).length > 0 ? (
+  // Per-panel render functions. Conditional panels (daily, challenges)
+  // return null when their data isn't ready — they're skipped silently
+  // by `renderPanel` so an empty data state doesn't leave a placeholder
+  // on the dashboard.
+  const panelRenderers: Record<PanelId, () => React.ReactNode> = {
+    resume: () => null, // handled site-wide in AppShell's ResumeDebateBanner
+    daily: () =>
+      daily.data?.daily ? <DailyTopicCard topic={daily.data.daily} /> : null,
+    challenges: () =>
+      (challenges.data?.challenges ?? []).length > 0 ? (
         <ChallengesCard
           challenges={challenges.data!.challenges}
           viewerId={userId}
         />
-      ) : null}
-
-      <CtaTiles />
-
+      ) : null,
+    cta: () => <CtaTiles />,
+    live: () => (
       <Panel title={t("live_debates_title")}>
         {active.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
@@ -61,7 +66,8 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
           <DebateGrid debates={active.data!.debates} viewerId={userId} />
         )}
       </Panel>
-
+    ),
+    trending: () => (
       <Panel title={t("trending_title")}>
         {trending.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
@@ -83,7 +89,8 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
           </ul>
         )}
       </Panel>
-
+    ),
+    past: () => (
       <Panel title={t("past_debates_title")}>
         {myPast.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
@@ -98,6 +105,133 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
           />
         )}
       </Panel>
+    ),
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-end gap-2 text-xs">
+        {customizing ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                reset();
+                setCustomizing(false);
+              }}
+              className="font-condensed uppercase tracking-wider text-sepia hover:text-ink"
+            >
+              Reset to default
+            </button>
+            <button
+              type="button"
+              onClick={() => setCustomizing(false)}
+              className="rounded bg-red px-3 py-1 font-condensed uppercase tracking-wider text-paper hover:opacity-90"
+            >
+              Done
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCustomizing(true)}
+            className="font-condensed uppercase tracking-wider text-sepia hover:text-ink"
+          >
+            ⇅ Customize layout
+          </button>
+        )}
+      </div>
+
+      {order.map((id, idx) => {
+        const content = panelRenderers[id]();
+        if (!content) return null;
+        return (
+          <DraggablePanel
+            key={id}
+            id={id}
+            index={idx}
+            order={order}
+            customizing={customizing}
+            onMove={move}
+          >
+            {content}
+          </DraggablePanel>
+        );
+      })}
+    </div>
+  );
+}
+
+// Drag-and-drop wrapper. In customize mode each panel gets a dashed
+// border, a grip handle, and listens for native HTML5 drag events.
+// Drop reorders via the `onMove` callback (which persists). Outside
+// customize mode it's transparent — children render as if it isn't
+// there.
+function DraggablePanel({
+  id,
+  index,
+  order,
+  customizing,
+  onMove,
+  children,
+}: {
+  id: PanelId;
+  index: number;
+  order: PanelId[];
+  customizing: boolean;
+  onMove: (from: number, to: number) => void;
+  children: React.ReactNode;
+}) {
+  if (!customizing) return <>{children}</>;
+  const moveUp = () => {
+    if (index > 0) onMove(index, index - 1);
+  };
+  const moveDown = () => {
+    if (index < order.length - 1) onMove(index, index + 1);
+  };
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/dt-panel-id", id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        const fromId = e.dataTransfer.getData("text/dt-panel-id");
+        const fromIdx = order.indexOf(fromId as PanelId);
+        if (fromIdx >= 0) onMove(fromIdx, index);
+      }}
+      className="relative rounded border-2 border-dashed border-gold p-1"
+    >
+      <div className="mb-1 flex items-center justify-between rounded bg-gold/20 px-2 py-1 text-[10px] font-condensed uppercase tracking-wider text-ink">
+        <span aria-hidden>⇅ drag to reorder</span>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={moveUp}
+            disabled={index === 0}
+            aria-label="Move panel up"
+            className="rounded px-1 hover:bg-paper disabled:opacity-30"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={moveDown}
+            disabled={index === order.length - 1}
+            aria-label="Move panel down"
+            className="rounded px-1 hover:bg-paper disabled:opacity-30"
+          >
+            ↓
+          </button>
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
@@ -183,6 +317,16 @@ function ChallengesCard({
               <button
                 type="button"
                 onClick={async () => {
+                  // Optimistically pull the challenge out of the inbox
+                  // immediately so the UI feels instant. If accept fails
+                  // we put it back via a refetch.
+                  const key = ["dashboard", "challenges-inbox"];
+                  const prev = qc.getQueryData<{ challenges: typeof challenges }>(key);
+                  qc.setQueryData<{ challenges: typeof challenges }>(key, (old) =>
+                    old
+                      ? { challenges: old.challenges.filter((x) => x.id !== c.id) }
+                      : old,
+                  );
                   try {
                     const res = await apiClient.post<{ debate_id: number }>(
                       `/api/challenges/${c.id}/accept`,
@@ -190,6 +334,9 @@ function ChallengesCard({
                     window.location.href = `/debate/${res.debate_id}`;
                   } catch (err) {
                     console.error("[challenges] accept failed:", err);
+                    // Rollback — restore the inbox so the user can retry.
+                    if (prev) qc.setQueryData(key, prev);
+                    qc.invalidateQueries({ queryKey: key });
                   }
                 }}
                 className="rounded bg-green-action px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper hover:opacity-90"
@@ -199,13 +346,20 @@ function ChallengesCard({
               <button
                 type="button"
                 onClick={async () => {
+                  // Optimistic remove — same pattern as accept.
+                  const key = ["dashboard", "challenges-inbox"];
+                  const prev = qc.getQueryData<{ challenges: typeof challenges }>(key);
+                  qc.setQueryData<{ challenges: typeof challenges }>(key, (old) =>
+                    old
+                      ? { challenges: old.challenges.filter((x) => x.id !== c.id) }
+                      : old,
+                  );
                   try {
                     await apiClient.post(`/api/challenges/${c.id}/decline`);
-                    qc.invalidateQueries({
-                      queryKey: ["dashboard", "challenges-inbox"],
-                    });
                   } catch (err) {
                     console.error("[challenges] decline failed:", err);
+                    if (prev) qc.setQueryData(key, prev);
+                    qc.invalidateQueries({ queryKey: key });
                   }
                 }}
                 className="rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"

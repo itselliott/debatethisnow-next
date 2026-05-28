@@ -27,7 +27,8 @@ import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
 import { useSocket } from "@/lib/hooks/use-socket";
 import { countWords } from "@/lib/utils/word-count";
-import { useTone } from "@/lib/hooks/use-tone";
+import { useLang, useTone } from "@/lib/hooks/use-tone";
+import { useVoiceInput } from "@/lib/hooks/use-voice-input";
 
 const MIN_WORDS = 15;
 // Mirrors server `env.MAX_ARGUMENT_WORDS` (default 800). The socket
@@ -48,8 +49,16 @@ export function Composer({
   const debateId = useStore(store, (s) => s.debateId);
   const socket = useSocket();
   const { t } = useTone();
+  const { lang } = useLang();
   const [text, setText] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Voice input — buffers interim transcripts so the textarea updates
+  // word-by-word as the user speaks. On final result the buffered text
+  // is committed and the buffer resets. Locale follows the user's
+  // chosen UI language (en-US vs es-ES).
+  const voiceLang = lang === "es" ? "es-ES" : "en-US";
+  const voice = useVoiceInput(voiceLang);
+  const baselineTextRef = useRef("");
   // `lastSubmitted` lets the error handler restore the user's text if
   // the server rejects. We hold it in a ref so the listener (mounted
   // once) always sees the freshest pending payload.
@@ -116,6 +125,28 @@ export function Composer({
 
   if (!isParticipant) return null;
 
+  const toggleVoice = () => {
+    if (voice.listening) {
+      voice.stop();
+      return;
+    }
+    // Remember what the user already typed; voice appends to that
+    // baseline so interim results don't blow away what they had.
+    baselineTextRef.current = text;
+    voice.start((r) => {
+      // Append interim + final transcripts to whatever was in the box
+      // when listening started. Final results commit + reset baseline
+      // so the next utterance appends after this one.
+      const merged =
+        (baselineTextRef.current ? baselineTextRef.current + " " : "") +
+        r.transcript.trim();
+      setText(merged);
+      if (r.isFinal) {
+        baselineTextRef.current = merged;
+      }
+    });
+  };
+
   const submit = () => {
     if (!isMyTurn) return;
     if (wc < MIN_WORDS) {
@@ -180,7 +211,38 @@ export function Composer({
           {errorMsg}
         </div>
       ) : null}
-      <div className="mt-3 flex justify-end">
+      {voice.error ? (
+        <div
+          role="alert"
+          className="mt-2 rounded border border-red bg-red/10 px-3 py-2 text-xs text-red-dark"
+        >
+          {voice.error}
+        </div>
+      ) : null}
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+        {voice.supported ? (
+          <button
+            type="button"
+            onClick={toggleVoice}
+            disabled={!isMyTurn}
+            aria-pressed={voice.listening}
+            title={
+              voice.listening
+                ? "Stop voice input"
+                : "Dictate your argument — uses your microphone"
+            }
+            className={`rounded border-2 px-3 py-2 font-condensed text-xs uppercase tracking-wider shadow-press-sm disabled:cursor-not-allowed disabled:opacity-50 ${
+              voice.listening
+                ? "border-red bg-red text-paper"
+                : "border-ink bg-paper text-ink hover:bg-ink hover:text-paper"
+            }`}
+          >
+            <span aria-hidden className="mr-1">
+              {voice.listening ? "●" : "🎙"}
+            </span>
+            {voice.listening ? "Listening" : "Speak"}
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={!isMyTurn || wc < MIN_WORDS || wc > MAX_WORDS}

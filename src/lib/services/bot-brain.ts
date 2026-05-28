@@ -500,6 +500,60 @@ async function generateWithGroq(args: GenerateArgs): Promise<string | null> {
   }
 }
 
+/**
+ * Groq streaming variant. Calls `onChunk(text)` repeatedly with the
+ * cumulative content as the model emits tokens, then resolves with
+ * the final full text. Returns null on failure (caller falls back).
+ *
+ * Only Groq supports streaming in our bot-scheduler today. Other
+ * brains (Gemini / Mistral / Cerebras / Claude) keep their non-
+ * streaming path; the scheduler picks streaming only when Groq is
+ * the chosen brain.
+ */
+export async function generateWithGroqStreaming(
+  args: GenerateArgs,
+  onChunk: (cumulative: string) => void,
+): Promise<string | null> {
+  const client = getGroqClient();
+  if (!client) return null;
+  const { system, user } = buildPrompt(
+    args.personality,
+    args.topic,
+    args.side,
+    args.roundNumber,
+    args.prior,
+    args.myUsername,
+    args.oppUsername,
+  );
+  try {
+    const stream = await client.chat.completions.create({
+      model: env.GROQ_MODEL,
+      max_tokens: 600,
+      temperature: 0.7,
+      stream: true,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    });
+    let cumulative = "";
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content ?? "";
+      if (!delta) continue;
+      cumulative += delta;
+      onChunk(cumulative);
+    }
+    const trimmed = cumulative.trim();
+    return trimmed || null;
+  } catch (err) {
+    console.warn(
+      "[bot-brain] Groq streaming failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
 async function generateWithGemini(args: GenerateArgs): Promise<string | null> {
   if (!env.GEMINI_API_KEY) return null;
   const { system, user } = buildPrompt(
@@ -858,6 +912,12 @@ export interface TakeTurnResult {
 export async function takeTurnNow(
   debateId: number,
   botUserId: number,
+  // Optional streaming callback. When provided AND the bot's brain is
+  // Groq AND a key is set, generation runs in streaming mode and the
+  // callback is invoked with the cumulative content as each delta
+  // arrives. The bot-scheduler uses this to emit `argument_streaming`
+  // socket events for token-by-token rendering on the client.
+  onChunk?: (cumulative: string) => void,
 ): Promise<TakeTurnResult | null> {
   const debate = await prisma.debate.findUnique({
     where: { id: debateId },
@@ -919,7 +979,10 @@ export async function takeTurnNow(
   }));
   let content: string | null = null;
   if (!forceCanned) {
-    content = await generate(brain, {
+    // Streaming path: only Groq supports it today, and only when the
+    // caller (bot-scheduler) wants per-token updates. Falls back to
+    // non-streaming generate() on any failure.
+    const args: GenerateArgs = {
       personality,
       topic: debate.topic,
       side,
@@ -927,7 +990,13 @@ export async function takeTurnNow(
       prior,
       myUsername: bot.username,
       oppUsername: opp?.username ?? "opponent",
-    });
+    };
+    if (onChunk && brain === "groq") {
+      content = await generateWithGroqStreaming(args, onChunk);
+    }
+    if (!content) {
+      content = await generate(brain, args);
+    }
   }
   let usedFallback = false;
   if (!content || content.split(/\s+/).filter(Boolean).length < 15) {

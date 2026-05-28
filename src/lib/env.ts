@@ -63,6 +63,17 @@ const EnvSchema = z.object({
 
   ANTHROPIC_API_KEY: z.string().optional(),
 
+  // Resend (transactional email — magic-link sign-in). When unset,
+  // sendEmail() logs the would-be email to the server console so
+  // local dev still works.
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().optional(),
+
+  // Public site URL — used to build absolute links in outbound email
+  // (magic-link URL) and JSON-LD canonical URLs. Falls back to
+  // debatethisnow.com when unset.
+  NEXT_PUBLIC_BASE_URL: z.string().optional(),
+
   ELO_K_FACTOR: z.coerce.number().int().default(32),
   MATCH_ELO_WINDOW: z.coerce.number().int().default(200),
   STALE_DEBATE_MINUTES: z.coerce.number().int().default(60),

@@ -27,10 +27,24 @@ const UNLIMITED_THRESHOLD_S = 900;
 /** 24 hours — hard clamp on any positive deadline. */
 const HARD_CAP_S = 60 * 60 * 24;
 
+// Streaming bubble — a placeholder "this bot is typing right now" entry
+// that lives separately from the persisted `messages` list. The bot
+// scheduler emits `argument_streaming` events as Groq deltas arrive;
+// each event replaces this slot with the cumulative content. When the
+// stream completes, `argument_streaming_done` clears it and the real
+// persisted message appears via the normal `argument_posted` path.
+export interface StreamingBubble {
+  streamId: string;
+  authorId: number;
+  authorUsername: string;
+  content: string;
+}
+
 export interface DebateStoreState {
   debateId: number;
   state: DebateDict | null;
   messages: DebateMessageDict[];
+  streaming: StreamingBubble | null;
   result: DebateResultDict | null;
   // Display timer — recalculated every tick from turn_deadline.
   secondsRemaining: number;
@@ -46,6 +60,7 @@ export interface DebateStoreState {
   // ---- mutations ----
   setState(state: DebateDict, my_role?: string, my_vote?: number | null, spectator_count?: number): void;
   appendMessage(msg: DebateMessageDict): void;
+  setStreaming(b: StreamingBubble | null): void;
   setResult(result: DebateResultDict): void;
   showEndScreen(): void;
   setVote(voteFor: number | null): void;
@@ -92,6 +107,7 @@ export function createDebateStore(debateId: number) {
     debateId,
     state: null,
     messages: [],
+    streaming: null,
     result: null,
     secondsRemaining: 0,
     votingSecondsRemaining: null,
@@ -119,8 +135,20 @@ export function createDebateStore(debateId: number) {
     appendMessage(msg) {
       set((s) => {
         if (s.messages.some((m) => m.id === msg.id)) return s;
-        return { messages: [...s.messages, msg] };
+        // New message arrived → any in-flight streaming bubble from
+        // the same author is now redundant. Clear it so we don't
+        // double-render.
+        return {
+          messages: [...s.messages, msg],
+          streaming:
+            s.streaming && s.streaming.authorUsername === msg.author_username
+              ? null
+              : s.streaming,
+        };
       });
+    },
+    setStreaming(b) {
+      set({ streaming: b });
     },
     setResult(result) {
       set({ result });

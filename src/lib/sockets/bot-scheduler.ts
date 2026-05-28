@@ -49,7 +49,48 @@ async function runHouseTurn(
   botId: number,
 ): Promise<void> {
   try {
-    const generated = await takeTurnNow(debateId, botId);
+    // Resolve the bot's username up front so streaming chunks carry
+    // it for client-side rendering — the placeholder bubble needs a
+    // name to display before the message is persisted.
+    const botRow = await prisma.user.findUnique({
+      where: { id: botId },
+      select: { username: true },
+    });
+    const room = `debate:${debateId}`;
+    const author = botRow?.username ?? "bot";
+    // Per-call streaming id. Used by the client to associate streaming
+    // chunks with the right placeholder bubble — multiple bots can
+    // stream in the same room if we ever support n-way debates.
+    const streamId = `stream-${debateId}-${botId}-${Date.now()}`;
+    let lastEmitted = "";
+    let lastEmitAt = 0;
+    const onChunk = (cumulative: string) => {
+      // Throttle to ~10 emits/sec — Groq fires deltas at ~50/sec which
+      // is more network chatter than we need; the visible smoothness
+      // is identical at 10/sec but bandwidth and React work are cut
+      // 5x.
+      const now = Date.now();
+      if (now - lastEmitAt < 100 && cumulative.length - lastEmitted.length < 80) {
+        return;
+      }
+      lastEmitted = cumulative;
+      lastEmitAt = now;
+      io.to(room).emit("argument_streaming", {
+        debate_id: debateId,
+        stream_id: streamId,
+        author_id: botId,
+        author_username: author,
+        partial_content: cumulative,
+      });
+    };
+    const generated = await takeTurnNow(debateId, botId, onChunk);
+    // Stop the placeholder regardless of whether we got real content
+    // (the client clears the bubble on this event so a failed stream
+    // doesn't leave dead UI behind).
+    io.to(room).emit("argument_streaming_done", {
+      debate_id: debateId,
+      stream_id: streamId,
+    });
     if (!generated) return; // bot-brain logged the reason
     const msg = await submitArgument(debateId, botId, generated.content);
     if (!msg) {

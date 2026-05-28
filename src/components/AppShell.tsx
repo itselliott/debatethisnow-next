@@ -20,6 +20,7 @@ import { Sidebar } from "@/components/sidebar/Sidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SoundAmbience } from "@/components/SoundAmbience";
 import { ResumeDebateBanner } from "@/components/ResumeDebateBanner";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { useSidebarCollapsed } from "@/lib/hooks/use-sidebar";
 import { useTone } from "@/lib/hooks/use-tone";
 
@@ -29,7 +30,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t } = useTone();
   const { collapsed, toggle } = useSidebarCollapsed();
-  const isPublic = PUBLIC_PATHS.has(pathname);
+  // Magic-link landing is a standalone auth page; it should render
+  // centered without the sidebar shell, same as /login.
+  const isPublic =
+    PUBLIC_PATHS.has(pathname) || pathname.startsWith("/auth/");
 
   if (isPublic) {
     return (
@@ -38,6 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {t("skip_to_content")}
         </a>
         <SoundAmbience />
+        <ServiceWorkerRegistrar />
         <div id="main-content">{children}</div>
       </>
     );
@@ -49,6 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {t("skip_to_content")}
       </a>
       <SoundAmbience />
+      <ServiceWorkerRegistrar />
 
       {/* Floating expand button — desktop only, mounted when sidebar is
           collapsed. Mobile uses MobileBottomNav so this never shows there. */}

@@ -85,32 +85,65 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
     }
   };
 
-  const accept = async (id: number) => {
+  // Helper: optimistic removal from a TanStack-cached list. Pull the
+  // row out instantly so the UI is responsive; on error roll back +
+  // refetch. Used by accept / decline / remove — all three are "make
+  // this row disappear" operations from the user's POV.
+  const optimisticRemove = async (
+    queryKey: readonly unknown[],
+    rowId: number,
+    rowKey: "incoming" | "outgoing" | "friends",
+    apiCall: () => Promise<unknown>,
+  ) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prev = qc.getQueryData<any>(queryKey);
+    if (prev) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      qc.setQueryData<any>(queryKey, (old: any) => {
+        if (!old) return old;
+        if (rowKey in old) {
+          return {
+            ...old,
+            [rowKey]: old[rowKey].filter((r: { id: number }) => r.id !== rowId),
+          };
+        }
+        return old;
+      });
+    }
     try {
-      await apiClient.post(`/api/friends/${id}/accept`);
+      await apiCall();
       qc.invalidateQueries({ queryKey: ["friends"] });
     } catch (err) {
-      console.warn("[friends] accept failed:", err);
+      console.warn("[friends] mutation failed:", err);
+      if (prev) qc.setQueryData(queryKey, prev);
+      qc.invalidateQueries({ queryKey });
     }
   };
 
-  const decline = async (id: number) => {
-    try {
-      await apiClient.post(`/api/friends/${id}/decline`);
-      qc.invalidateQueries({ queryKey: ["friends"] });
-    } catch (err) {
-      console.warn("[friends] decline failed:", err);
-    }
-  };
+  const accept = (id: number) =>
+    optimisticRemove(
+      ["friends", "requests"],
+      id,
+      "incoming",
+      () => apiClient.post(`/api/friends/${id}/accept`),
+    );
+
+  const decline = (id: number) =>
+    optimisticRemove(
+      ["friends", "requests"],
+      id,
+      "incoming",
+      () => apiClient.post(`/api/friends/${id}/decline`),
+    );
 
   const remove = async (id: number) => {
     if (!window.confirm("Remove this friend?")) return;
-    try {
-      await apiClient.delete(`/api/friends/${id}`);
-      qc.invalidateQueries({ queryKey: ["friends"] });
-    } catch (err) {
-      console.warn("[friends] remove failed:", err);
-    }
+    await optimisticRemove(
+      ["friends", "list"],
+      id,
+      "friends",
+      () => apiClient.delete(`/api/friends/${id}`),
+    );
   };
 
   return (
