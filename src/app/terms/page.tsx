@@ -1,7 +1,8 @@
 /**
- * /terms — placeholder legal content. Replace with your final Terms of
- * Service. Recommended: get a lawyer or use Terms-of-Service-generator
- * services like termly.io.
+ * /terms — plain-English Terms of Service. Mirrors what the app
+ * actually does. Substantive review by counsel before any
+ * jurisdiction-specific dispute should still happen, but the wording
+ * here is what we stand behind today.
  */
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -91,14 +92,13 @@ export default function TermsPage() {
 
       <Section title="7. Contact">
         <p>
-          Questions? Email us. <em>(Address goes here.)</em>
+          Questions about these terms? Email{" "}
+          <a href="mailto:hello@debatethisnow.com" className="text-red underline">
+            hello@debatethisnow.com
+          </a>
+          .
         </p>
       </Section>
-
-      <p className="text-xs text-sepia">
-        This template is a starting point, not legal advice. Replace with a
-        lawyer-reviewed Terms of Service before launch.
-      </p>
     </article>
   );
 }

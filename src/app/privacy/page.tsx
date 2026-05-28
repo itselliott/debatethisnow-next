@@ -1,6 +1,7 @@
 /**
- * /privacy — placeholder privacy policy. Mirrors what the app actually
- * collects, but the legal phrasing should be reviewed before launch.
+ * /privacy — plain-English privacy policy. Describes what the app
+ * actually collects and shares. Anything new gets added here before
+ * shipping it.
  */
 import type { Metadata } from "next";
 
@@ -101,7 +102,11 @@ export default function PrivacyPage() {
             Effective immediately.
           </li>
           <li>
-            <strong>Export your data</strong> — email us. <em>(Address goes here.)</em>
+            <strong>Export your data</strong> — email{" "}
+            <a href="mailto:hello@debatethisnow.com" className="text-red underline">
+              hello@debatethisnow.com
+            </a>
+            .
           </li>
           <li>
             <strong>Correct errors</strong> in your profile — Settings.
@@ -132,11 +137,6 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <p className="text-xs text-sepia">
-        This template covers what the app actually does today, but the
-        final wording should be reviewed by a lawyer (especially for GDPR
-        / CCPA compliance) before launch.
-      </p>
     </article>
   );
 }

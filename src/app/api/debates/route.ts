@@ -18,6 +18,12 @@ import {
   enterQueue,
   queueLength,
 } from "@/lib/services/matchmaking-service";
+import { rateCheck } from "@/lib/rate-limit";
+
+// Queue-entry rate limit. 30/min is generous (a frustrated user
+// re-queueing repeatedly is fine), but stops a script from cycling
+// queue states to probe the matchmaker.
+const QUEUE_LIMIT = { count: 30, windowMs: 60_000 };
 
 const Body = z.object({
   topic: z.string().min(1).max(255),
@@ -29,6 +35,13 @@ export async function POST(req: NextRequest) {
   if (csrf) return csrf;
   const resolved = await requireUserOr401(req);
   if (resolved instanceof NextResponse) return resolved;
+  const limit = rateCheck(`queue:${resolved.user.id}`, QUEUE_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    );
+  }
   const raw = await readJsonOr400(req);
   if (raw instanceof NextResponse) return raw;
   const parsed = Body.safeParse(raw);

@@ -19,6 +19,12 @@ import { clearAuthCookies } from "@/lib/auth/cookies";
 import { revokeToken } from "@/lib/services/token-service";
 import { toPrivateDict } from "@/lib/serializers/user";
 import { prisma } from "@/lib/db";
+import { checkCsrfOrReject } from "@/lib/api/guard";
+import { rateCheck } from "@/lib/rate-limit";
+
+// Account deletion is irreversible. Tight per-user limit defends
+// against a stolen-session attacker brute-forcing the password gate.
+const DELETE_LIMIT = { count: 3, windowMs: 60_000 };
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveUserFromRequest(req);
@@ -36,11 +42,20 @@ const DeleteBody = z.object({
 });
 
 export async function DELETE(req: NextRequest) {
+  const csrf = await checkCsrfOrReject(req);
+  if (csrf) return csrf;
   const resolved = await resolveUserFromRequest(req);
   if (!resolved) {
     return NextResponse.json(
       { error: "unauthorized", message: "Missing or invalid token" },
       { status: 401 },
+    );
+  }
+  const limit = rateCheck(`delete-me:${resolved.user.id}`, DELETE_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
     );
   }
   let body: unknown;

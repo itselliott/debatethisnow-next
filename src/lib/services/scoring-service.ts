@@ -235,8 +235,13 @@ export function summarizeDebate(
   } else {
     verdict = "A decisive showing — one side controlled the structure of the argument.";
   }
+  // Statistical verdict — used when the LLM judge is disabled, rate-
+  // limited, or returns nothing. Reads as a real judge's note, not as
+  // "your debate was placeholder-scored." Scores come from the same
+  // length + structure + variety analyzer either way.
   return (
-    `AI placeholder scored ${p1} ${aiP1}/100 vs ${p2} ${aiP2}/100 across ` +
-    `${messageCount} arguments. ${verdict}`
+    `Scored on argument length, structure, and variety: ` +
+    `${p1} ${aiP1}/100, ${p2} ${aiP2}/100 across ${messageCount} arguments. ` +
+    verdict
   );
 }

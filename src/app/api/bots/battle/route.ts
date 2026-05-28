@@ -21,6 +21,12 @@ import {
 import { isHouseBot } from "@/lib/services/bot-brain";
 import { startTurn } from "@/lib/services/debate-service";
 import { getSocketIo } from "@/lib/sockets/io-handle";
+import { rateCheck } from "@/lib/rate-limit";
+
+// Staging bot battles spins up DB writes + LLM calls per turn. 10/min
+// per staging user is generous for normal browsing of /bots, but blocks
+// a script from queueing hundreds of bot debates in parallel.
+const BATTLE_LIMIT = { count: 10, windowMs: 60_000 };
 
 const Body = z.object({
   bot1_id: z.coerce.number().int(),
@@ -34,6 +40,13 @@ export async function POST(req: NextRequest) {
   if (csrf) return csrf;
   const resolved = await requireUserOr401(req);
   if (resolved instanceof NextResponse) return resolved;
+  const limit = rateCheck(`bot-battle:${resolved.user.id}`, BATTLE_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    );
+  }
   const raw = await readJsonOr400(req);
   if (raw instanceof NextResponse) return raw;
   const parsed = Body.safeParse(raw);

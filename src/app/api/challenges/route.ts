@@ -17,6 +17,11 @@ import {
 import { isBlockedEitherWay } from "@/lib/services/block-service";
 import { notify } from "@/lib/services/notification-service";
 import { toChallengeDict } from "@/lib/serializers/challenge";
+import { rateCheck } from "@/lib/rate-limit";
+
+// Challenges create a real notification on the target. 20/min stops a
+// scripted spam attack without affecting normal use.
+const CHALLENGE_LIMIT = { count: 20, windowMs: 60_000 };
 
 const Body = z.object({
   target_username: z.string(),
@@ -30,6 +35,13 @@ export async function POST(req: NextRequest) {
   if (csrf) return csrf;
   const resolved = await requireUserOr401(req);
   if (resolved instanceof NextResponse) return resolved;
+  const limit = rateCheck(`challenge:${resolved.user.id}`, CHALLENGE_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    );
+  }
   const raw = await readJsonOr400(req);
   if (raw instanceof NextResponse) return raw;
   const parsed = Body.safeParse(raw);

@@ -17,6 +17,12 @@ import {
 import { notify } from "@/lib/services/notification-service";
 import { toFriendshipDict } from "@/lib/serializers/friendship";
 import { getSocketIo } from "@/lib/sockets/io-handle";
+import { rateCheck } from "@/lib/rate-limit";
+
+// Friend-request spam mitigation. 20/min per user is generous for
+// normal use (you'd have to be plowing through search results) but
+// blocks a script from blasting requests at every account on the site.
+const REQUEST_LIMIT = { count: 20, windowMs: 60_000 };
 
 const Body = z.object({ target_username: z.string() });
 
@@ -25,6 +31,13 @@ export async function POST(req: NextRequest) {
   if (csrf) return csrf;
   const resolved = await requireUserOr401(req);
   if (resolved instanceof NextResponse) return resolved;
+  const limit = rateCheck(`friend-req:${resolved.user.id}`, REQUEST_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    );
+  }
   const raw = await readJsonOr400(req);
   if (raw instanceof NextResponse) return raw;
   const parsed = Body.safeParse(raw);

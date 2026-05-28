@@ -22,6 +22,11 @@ import { brainMeta, getBrain, isHouseBot } from "@/lib/services/bot-brain";
 import { hashPassword } from "@/lib/auth/password";
 import { rankTierForElo } from "@/lib/services/rank-service";
 import { toPublicDict } from "@/lib/serializers/user";
+import { rateCheck } from "@/lib/rate-limit";
+
+// Bot creation provisions an API key + DB row + stats row. Tight cap
+// stops a script from minting hundreds of bot accounts.
+const CREATE_LIMIT = { count: 5, windowMs: 60_000 };
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 
@@ -69,6 +74,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "bots_cannot_create_bots" },
       { status: 403 },
+    );
+  }
+  const limit = rateCheck(`bot-create:${resolved.user.id}`, CREATE_LIMIT);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
     );
   }
   const raw = await readJsonOr400(req);

@@ -1,18 +1,17 @@
 /**
- * i18n bundle store. The full English + Spanish bundles from
- * [app/i18n.py:TRANSLATIONS] will be ported in Phase 5 alongside the
- * UI surfaces that consume them. For Phase 3 we ship the endpoint
- * contract (LANGUAGES + TRANSLATIONS shape + DEFAULT_LANG) with a
- * minimal English starter set so the i18n routes return well-formed
- * payloads.
+ * i18n bundle store — legacy contract from the Python parity port. The
+ * actual UI translation layer lives in `src/lib/tone/phrases.ts`, which
+ * combines language × tone in one resolver and is what every React
+ * component reads via `useTone()` / `useLang()`.
  *
- * The shape MUST match Python:
+ * The bundles below stay because two API routes (`/api/i18n/[lang]` and
+ * `/api/i18n/languages`) still expose them — useful for external bots
+ * or future SDKs that want the localized strings without parsing React.
+ *
+ * Shape mirrors Python:
  *   - LANGUAGES = [{code, label, flag}, ...]
  *   - DEFAULT_LANG = "en"
  *   - TRANSLATIONS = { "<lang_code>": { "<key>": "<value>", ... }, ... }
- *
- * Unknown keys at the client return `undefined` and the JS i18n layer
- * falls back to `data-i18n-default` attributes.
  */
 
 export interface LanguageEntry {
@@ -28,10 +27,9 @@ export const LANGUAGES: ReadonlyArray<LanguageEntry> = [
 
 export const DEFAULT_LANG = "en";
 
-// Phase 5 will replace this with the full strings from
-// [app/i18n.py:TRANSLATIONS]. For now we ship the keys we already use
-// in the Phase 1 layout/sidebar/login/register surfaces so they don't
-// render undefined when i18n is wired up in Phase 5.
+// The real UI translation surface is in `lib/tone/phrases.ts`. This
+// dictionary is the legacy contract for the `/api/i18n/*` endpoints,
+// so external consumers of those endpoints still get well-formed data.
 export const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
     "nav.home": "Home",
@@ -59,11 +57,29 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     "auth.have_account": "Already in? Log in",
   },
   es: {
-    // Stub — Phase 5 will port the full Spanish bundle from Python.
     "nav.home": "Inicio",
+    "nav.trending": "Debates Populares",
+    "nav.my_debates": "Mis Debates",
+    "nav.stats": "Estadísticas",
     "nav.settings": "Ajustes",
+    "nav.bots": "Arena de Bots",
+    "nav.logout": "CERRAR SESIÓN",
     "btn.login": "INICIAR SESIÓN",
     "btn.register": "REGISTRARSE",
+    "btn.create_account": "CREAR CUENTA",
+    "btn.cancel": "CANCELAR",
+    "btn.confirm": "CONFIRMAR",
+    "btn.queue_up": "ENTRAR A LA COLA",
+    "auth.login.title": "Iniciar Sesión",
+    "auth.login.sub": "Entra al coliseo.",
+    "auth.register.title": "Crear Cuenta",
+    "auth.register.sub": "Elige un nombre. Gana tu rango.",
+    "auth.username": "Usuario",
+    "auth.email": "Correo",
+    "auth.password": "Contraseña",
+    "auth.identifier": "Usuario o Correo",
+    "auth.no_account": "¿No tienes cuenta? Crea una",
+    "auth.have_account": "¿Ya tienes cuenta? Inicia sesión",
   },
 };
 
