@@ -166,3 +166,58 @@
     );
   }
 }
+
+/*
+ * Blog CTA styles. Every blog article embeds raw HTML CTA blocks like:
+ *
+ *   <div class="cta-inline">
+ *     <p>...pitch...</p>
+ *     <a class="btn" href="/register">CALL TO ACTION</a>
+ *   </div>
+ *
+ * react-markdown + rehype-raw pass these through unchanged; these rules
+ * give them the WPA-poster letterpress treatment so they read as real
+ * conversion surfaces, not text. Mirrors the Python app's blog.css.
+ */
+.cta-inline {
+  margin: 2rem 0;
+  padding: 1.25rem 1.5rem;
+  border: 3px double var(--color-ink);
+  background: var(--color-paper-2);
+  box-shadow: 4px 4px 0 var(--color-ink);
+  border-radius: 4px;
+  text-align: center;
+}
+.cta-inline p {
+  margin: 0 0 0.75rem 0;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: var(--color-ink);
+}
+.cta-inline .btn,
+.prose-blog a.btn {
+  display: inline-block;
+  padding: 0.65rem 1.5rem;
+  background: var(--color-red);
+  color: var(--color-paper);
+  font-family: var(--font-condensed);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 var(--color-ink);
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
+}
+.cta-inline .btn:hover,
+.prose-blog a.btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 var(--color-ink);
+  color: var(--color-paper);
+}
+.cta-inline .btn:active,
+.prose-blog a.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}

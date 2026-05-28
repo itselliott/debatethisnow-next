@@ -24,6 +24,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { validateProdEnv } from "./src/lib/env";
 import { seedCatalog } from "./src/lib/services/achievement-service";
 import {
+  brainStatus,
   releaseStuckHouseBots,
   seedMissingHouseBots,
 } from "./src/lib/services/bot-brain";
@@ -48,6 +49,25 @@ async function runStartupHooks(): Promise<void> {
   // server from coming up — the live-check probe will catch it
   // separately, and the hooks become a no-op once the DB returns.
   const tasks: Array<[string, () => Promise<unknown>]> = [
+    // Surface LLM brain status loudly at boot — a missing key here is
+    // the difference between "bots use real AI" and "bots throw canned
+    // templates", and the canned path is silent on a per-turn basis.
+    // Print once at startup so the operator notices.
+    ["brain-status", async () => {
+      const { active, inactive } = brainStatus();
+      if (active.length === 0) {
+        console.warn(
+          `[startup] NO LLM BRAIN KEYS CONFIGURED — every bot turn will ` +
+            `fall back to canned templates. Set at least one of: ` +
+            inactive.join(", "),
+        );
+      } else {
+        console.log(
+          `[startup] LLM brains active: ${active.join(", ")}` +
+            (inactive.length > 0 ? ` (inactive: ${inactive.join(", ")})` : ""),
+        );
+      }
+    }],
     // Reset every online_status to 'offline' on boot. on_connect
     // re-marks users as online when their socket reconnects.
     ["online-status-reset", async () => {

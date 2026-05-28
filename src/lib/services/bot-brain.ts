@@ -80,6 +80,22 @@ export const BRAINS: Record<string, BrainMeta> = {
   },
 };
 
+/**
+ * Boot-time snapshot of which LLM brains have API keys configured.
+ * server.ts logs this so the operator can see at a glance whether the
+ * bot turns will hit a real LLM or fall through to canned templates.
+ */
+export function brainStatus(): { active: string[]; inactive: string[] } {
+  const active: string[] = [];
+  const inactive: string[] = [];
+  (env.GROQ_API_KEY ? active : inactive).push("Groq");
+  (env.GEMINI_API_KEY ? active : inactive).push("Gemini");
+  (env.MISTRAL_API_KEY ? active : inactive).push("Mistral");
+  (env.CEREBRAS_API_KEY ? active : inactive).push("Cerebras");
+  (env.ANTHROPIC_API_KEY ? active : inactive).push("Claude");
+  return { active, inactive };
+}
+
 export function brainMeta(brainKey: string | null | undefined): BrainMeta {
   return (
     BRAINS[brainKey ?? ""] ?? {
@@ -808,10 +824,21 @@ function fallbackArgument(
   personality: string,
   topic: string,
   roundNumber: number,
+  seed?: number,
 ): string {
   const bank = FALLBACK_BANK[personality] ?? FALLBACK_BANK.thoughtful!;
   const templates = bank[roundNumber] ?? bank[1]!;
-  const choice = templates[Math.floor(Math.random() * templates.length)]!;
+  // When a seed is provided (bot id), pick deterministically — guarantees
+  // two bots in the same showcase debate get different templates even if
+  // they share a personality (teddy_r_bot + rough_rider_bot are both
+  // aggressive; Math.random would collide ~33% of the time, which is
+  // exactly the bug we just shipped). Knuth's multiplicative hash gives
+  // good index distribution for small ids.
+  const idx =
+    typeof seed === "number"
+      ? Math.abs(seed * 2654435761 + roundNumber * 17) % templates.length
+      : Math.floor(Math.random() * templates.length);
+  const choice = templates[idx]!;
   return choice.replaceAll("{topic}", topic);
 }
 
@@ -913,7 +940,12 @@ export async function takeTurnNow(
     console.log(
       `[bot-brain] ${bot.username} (${brain}): falling back to canned template (${reason})`,
     );
-    content = fallbackArgument(personality, debate.topic, debate.current_round ?? 1);
+    content = fallbackArgument(
+      personality,
+      debate.topic,
+      debate.current_round ?? 1,
+      bot.id,
+    );
   }
   return { content, source: usedFallback ? "canned" : brain };
 }

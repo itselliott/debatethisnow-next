@@ -35,36 +35,60 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://debatethisnow.com"
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: "DebateThis — An Online Arena for Arguments",
+    default: "DebateThis — Online Debate Practice, 1v1 vs Humans or AI",
     template: "%s · DebateThis",
   },
   description:
-    "Compete in structured 1v1 debates. Three rounds. One winner. Real Elo. Free to play, bot opponents available 24/7.",
+    "Free online debate platform. Practice structured 1v1 debates against real opponents or AI bots. Three rounds, real Elo ranking, no signup wall. Best debate practice app for students, debate clubs, and anyone who likes to argue.",
   applicationName: "DebateThis",
   keywords: [
     "debate",
     "online debate",
+    "debate practice",
+    "debate app",
+    "debate game",
+    "debate platform",
     "1v1 debate",
+    "AI debate",
+    "AI debate practice",
+    "debate against AI",
+    "free debate",
+    "debate club",
+    "debate topics",
+    "debate training",
     "argument practice",
+    "competitive debate",
+    "Lincoln-Douglas debate",
+    "Public Forum debate",
+    "policy debate",
+    "Congressional debate",
+    "PF debate",
+    "speech and debate",
+    "debate coach online",
+    "debate tournament",
     "debate Elo",
-    "debate AI",
     "structured argument",
+    "argue online",
   ],
   authors: [{ name: "DebateThis" }],
   creator: "DebateThis",
+  publisher: "DebateThis",
+  alternates: { canonical: BASE_URL },
   openGraph: {
     type: "website",
     url: BASE_URL,
-    title: "DebateThis — An Online Arena for Arguments",
+    title: "DebateThis — Online Debate Practice, 1v1 vs Humans or AI",
     description:
-      "Three rounds. One winner. Real Elo. Compete head-to-head or against AI bots.",
+      "Free 1v1 debate practice. Three rounds. Real Elo. Bot opponents 24/7. The fastest way to get reps in.",
     siteName: "DebateThis",
     locale: "en_US",
+    images: [{ url: `${BASE_URL}/og-default.png`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "DebateThis — An Online Arena for Arguments",
-    description: "Three rounds. One winner. Real Elo.",
+    title: "DebateThis — Online Debate Practice, 1v1 vs Humans or AI",
+    description: "Three rounds. One winner. Real Elo. Free practice against AI.",
+    images: [`${BASE_URL}/og-default.png`],
   },
   robots: {
     index: true,
@@ -74,6 +98,7 @@ export const metadata: Metadata = {
       follow: true,
       "max-image-preview": "large",
       "max-snippet": -1,
+      "max-video-preview": -1,
     },
   },
   formatDetection: {
@@ -81,6 +106,51 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
+};
+
+// Site-wide JSON-LD. Two blocks:
+//   1. WebSite with SearchAction — unlocks the Google sitelinks search
+//      box for branded "debatethis" queries.
+//   2. Organization — establishes DebateThis as a real entity Google
+//      can attribute articles to and show in the knowledge panel.
+// Both inlined in the <head> via a single <script> per Next.js
+// recommendation. Stays static, no JS, gets indexed on every crawl.
+const siteJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${BASE_URL}#website`,
+      url: BASE_URL,
+      name: "DebateThis",
+      description:
+        "Free online debate platform. Practice 1v1 against humans or AI.",
+      publisher: { "@id": `${BASE_URL}#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${BASE_URL}/blog?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+      inLanguage: "en-US",
+    },
+    {
+      "@type": "Organization",
+      "@id": `${BASE_URL}#organization`,
+      name: "DebateThis",
+      url: BASE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${BASE_URL}/og-default.png`,
+        width: 1200,
+        height: 630,
+      },
+      description:
+        "Online debate practice platform. 1v1 debates against humans or AI, structured rounds, real Elo ranking.",
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -93,6 +163,14 @@ export default function RootLayout({
       lang="en"
       className={`${bevan.variable} ${oswald.variable} ${lora.variable} ${specialElite.variable} h-full antialiased`}
     >
+      <head>
+        {/* Site-wide JSON-LD. WebSite + Organization on every page so
+            Google can resolve the entity consistently across the corpus. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+        />
+      </head>
       <body className="min-h-full">
         <AppProviders>
           {/*
