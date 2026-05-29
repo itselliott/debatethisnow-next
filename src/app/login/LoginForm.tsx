@@ -14,6 +14,7 @@
  */
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiError } from "@/lib/api-client";
 
 interface LoginResponse {
@@ -22,8 +23,14 @@ interface LoginResponse {
   message?: string;
 }
 
+// Query key for useCurrentUser — kept in sync with the constant in
+// use-current-user.ts. Stays as a tuple so TanStack Query matches it
+// exactly the same way.
+const ME_QUERY_KEY = ["auth", "me"] as const;
+
 export function LoginForm() {
   const router = useRouter();
+  const qc = useQueryClient();
 
   // ---- Magic-link state ----
   const [magicEmail, setMagicEmail] = useState("");
@@ -170,6 +177,14 @@ export function LoginForm() {
                 setPwError(data.message ?? data.error ?? "Login failed");
                 return;
               }
+              // Prime the auth-me cache with the freshly-issued user
+              // record BEFORE navigating. Otherwise useCurrentUser()
+              // reads the stale `null` cached from the anon page load
+              // and the dashboard hydrates as logged-out until a
+              // background refetch lands — which is the "have to
+              // refresh after logging in" bug.
+              qc.setQueryData(ME_QUERY_KEY, data.user);
+              await qc.invalidateQueries({ queryKey: ME_QUERY_KEY });
               router.push("/dashboard");
               router.refresh();
             } catch (err) {

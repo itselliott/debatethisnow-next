@@ -2,12 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface RegisterResponse {
   user?: { id: number; username: string };
   error?: string;
   message?: string;
 }
+
+const ME_QUERY_KEY = ["auth", "me"] as const;
 
 /**
  * Register/claim form. Two modes:
@@ -30,6 +33,7 @@ export function RegisterForm({
   presetUsername?: string | null;
 }) {
   const router = useRouter();
+  const qc = useQueryClient();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +72,15 @@ export function RegisterForm({
               setError(data.message ?? data.error ?? "Registration failed");
               return;
             }
+            // Prime the auth-me cache so the dashboard hydrates as
+            // signed-in immediately. Without this, useCurrentUser()
+            // reads the cached anon `null` and the page briefly
+            // renders logged-out until a background refetch lands —
+            // the "have to refresh" symptom the user hit on login.
+            if (data.user) {
+              qc.setQueryData(ME_QUERY_KEY, data.user);
+            }
+            await qc.invalidateQueries({ queryKey: ME_QUERY_KEY });
             router.push("/dashboard");
             router.refresh();
           } catch (err) {

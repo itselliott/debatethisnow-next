@@ -12,7 +12,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiError } from "@/lib/api-client";
+
+const ME_QUERY_KEY = ["auth", "me"] as const;
 
 type Phase =
   | { kind: "loading" }
@@ -23,6 +26,7 @@ type Phase =
 
 export function MagicVerifier() {
   const router = useRouter();
+  const qc = useQueryClient();
   const params = useSearchParams();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 
@@ -37,11 +41,17 @@ export function MagicVerifier() {
       try {
         await apiClient.post("/api/auth/magic/verify", { token });
         if (cancelled) return;
+        // Invalidate the cached anon auth-me result so the dashboard
+        // hydrates as signed-in. The verify response doesn't carry
+        // the user record so we can't seed it directly — invalidate
+        // and let useCurrentUser refetch.
+        await qc.invalidateQueries({ queryKey: ME_QUERY_KEY });
         setPhase({ kind: "success" });
         // Short delay so the user reads the "signed in!" message
         // before the redirect kicks them to the dashboard.
         window.setTimeout(() => {
           router.push("/dashboard");
+          router.refresh();
         }, 600);
       } catch (err) {
         if (cancelled) return;
