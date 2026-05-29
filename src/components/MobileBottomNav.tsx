@@ -17,6 +17,8 @@ import { usePathname } from "next/navigation";
 import { useTone } from "@/lib/hooks/use-tone";
 import type { PhraseKey } from "@/lib/tone/phrases";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { logoutAndRedirect } from "@/lib/auth/logout-client";
 
 interface Tab {
   href: string;
@@ -109,6 +111,11 @@ function MoreSheet({
   activePath: string;
 }) {
   const { t } = useTone();
+  // Only show the Log Out button when there's an actual session to
+  // log out of. Anon visitors (the /play flow lands here too) get
+  // a Log In link in the same slot instead.
+  const me = useCurrentUser();
+  const isAuthed = !!me.data;
   return (
     <div
       role="dialog"
@@ -153,6 +160,29 @@ function MoreSheet({
             className="bg-paper text-ink hover:bg-ink hover:text-paper"
           />
         </div>
+        {/* Log Out — only when there's a session to log out of. Sidebar
+         * is hidden on mobile, so without this row mobile users had no
+         * way to sign out except clearing cookies manually. Uses the
+         * same shared logout helper as the sidebar's button so the
+         * two can't drift apart. */}
+        {isAuthed ? (
+          <button
+            type="button"
+            onClick={() => void logoutAndRedirect()}
+            className="mt-3 w-full rounded border-2 border-red bg-red/10 py-2 font-condensed text-xs uppercase tracking-widest text-red-dark"
+          >
+            <span aria-hidden className="mr-1">⏻</span>
+            {t("sidebar_log_out")}
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            onClick={onClose}
+            className="mt-3 block w-full rounded border-2 border-red bg-red py-2 text-center font-condensed text-xs uppercase tracking-widest text-paper"
+          >
+            Log In
+          </Link>
+        )}
         <button
           type="button"
           onClick={onClose}

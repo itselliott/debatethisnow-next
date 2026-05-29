@@ -23,6 +23,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { displayAvatar } from "@/lib/avatars";
 import { tierColor } from "@/lib/tiers";
+import { logoutAndRedirect } from "@/lib/auth/logout-client";
 
 interface NavLink {
   href: string;
@@ -309,24 +310,8 @@ function SoundToggleButton({ compact = false }: { compact?: boolean }) {
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {
   const { t } = useTone();
-  const handleLogout = useCallback(async () => {
-    const csrf = document.cookie
-      .split(";")
-      .map((c) => c.trim())
-      .find((c) => c.startsWith("dt_csrf_access="))
-      ?.slice("dt_csrf_access=".length);
-    try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: csrf
-          ? { "X-CSRF-TOKEN": decodeURIComponent(csrf) }
-          : undefined,
-      });
-    } catch {
-      /* network errors are fine — cookie clear will still take effect */
-    }
-    window.location.href = "/login";
+  const handleLogout = useCallback(() => {
+    void logoutAndRedirect();
   }, []);
   return (
     <button
