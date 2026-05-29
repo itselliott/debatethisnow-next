@@ -1,8 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiClient, ApiError } from "@/lib/api-client";
+
+interface OwnedBot {
+  id: number;
+  username: string;
+  elo_rating: number;
+  online_status: string | null;
+  api_key: string | null;
+}
 
 interface BotDir {
   id: number;
@@ -81,6 +89,7 @@ export function BotsClient({
 
   return (
     <div className="space-y-6">
+      {signedIn ? <MyBotsPanel /> : null}
       {signedIn ? <RegisterBotPanel /> : null}
       {signedIn ? (
         <section className="rounded border-2 border-gold bg-paper-2 p-4 shadow-press">
@@ -345,6 +354,126 @@ function RegisterBotPanel() {
           >
             {submitting ? "Creating…" : "Create Bot"}
           </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Lists the user's owned bots with a Delete button per row. Hidden
+ * when the user hasn't registered any bots yet — no "you have 0 of 0"
+ * surface.
+ *
+ * Delete is a hard delete on the server (DELETE /api/bots/<id>) which
+ * cascades to UserAchievement / UserStats. The user has to confirm via
+ * window.confirm to avoid accidental loss.
+ */
+function MyBotsPanel() {
+  const router = useRouter();
+  const [bots, setBots] = useState<OwnedBot[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await apiClient.get<{ bots: OwnedBot[] }>("/api/bots/mine");
+        setBots(res.bots);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          setBots([]);
+          return;
+        }
+        console.warn("[bots/mine] fetch failed:", err);
+        setBots([]);
+      }
+    })();
+  }, []);
+
+  if (!bots || bots.length === 0) return null;
+
+  const remove = async (botId: number, username: string) => {
+    if (
+      !window.confirm(
+        `Delete ${username}? Their debate history stays but the bot account is removed. This can't be undone.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(botId);
+    setError(null);
+    // Optimistic remove — drop the row immediately, restore on error.
+    const prev = bots;
+    setBots((bs) => (bs ?? []).filter((b) => b.id !== botId));
+    try {
+      await apiClient.delete(`/api/bots/${botId}`);
+      // Refresh the directory below so the deleted bot disappears
+      // from the staging dropdown without a page reload.
+      router.refresh();
+    } catch (err) {
+      console.warn("[bots] delete failed:", err);
+      setBots(prev);
+      if (err instanceof ApiError) {
+        const data = err.data as { message?: string } | null;
+        setError(data?.message ?? `Couldn't delete ${username}.`);
+      } else {
+        setError(`Couldn't delete ${username}.`);
+      }
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  return (
+    <section className="rounded border-2 border-ink bg-paper-2 p-4 shadow-press">
+      <h2 className="mb-3 font-display text-lg">
+        Your Bots ({bots.length})
+      </h2>
+      <ul className="space-y-2">
+        {bots.map((b) => (
+          <li
+            key={b.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded border border-ink bg-paper p-3"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate font-display text-base text-ink">
+                  {b.username}
+                </span>
+                <span
+                  className={`shrink-0 rounded px-2 py-0.5 font-condensed text-[10px] uppercase tracking-wider ${
+                    b.online_status === "online"
+                      ? "bg-green-action text-paper"
+                      : b.online_status === "in_debate"
+                        ? "bg-gold-dark text-paper"
+                        : "bg-ink/30 text-paper"
+                  }`}
+                >
+                  {b.online_status ?? "offline"}
+                </span>
+              </div>
+              <div className="mt-0.5 text-xs text-sepia">
+                Elo {b.elo_rating}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => remove(b.id, b.username)}
+              disabled={deleting === b.id}
+              className="shrink-0 rounded border border-red px-3 py-1 font-condensed text-xs uppercase tracking-wider text-red hover:bg-red hover:text-paper disabled:opacity-50"
+            >
+              {deleting === b.id ? "Deleting…" : "Delete"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error ? (
+        <div
+          role="alert"
+          className="mt-2 rounded border border-red bg-red/10 px-3 py-2 text-sm text-red-dark"
+        >
+          {error}
         </div>
       ) : null}
     </section>

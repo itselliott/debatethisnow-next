@@ -10,13 +10,15 @@
  *     session. Each new utterance is appended to whatever text the
  *     caller already has.
  *   - `stop()` ends the session.
- *   - `supported` is false on Firefox + any non-Chromium browser today;
- *     callers should hide the mic button when supported is false so
- *     users don't get a broken affordance.
+ *   - `supported` is false on Firefox + any non-Chromium browser today.
  *
- * No external dependency — Web Speech API ships with Chrome, Edge,
- * Safari, and Opera. Firefox doesn't support it yet (still behind a
- * flag in 2026), so we feature-detect.
+ * Why the explicit `getUserMedia` pre-flight:
+ *   Web Speech opens its own audio stream, but on Edge in particular
+ *   the implicit permission prompt sometimes never fires — the
+ *   SpeechRecognition object just returns "not-allowed" without ever
+ *   asking the user. Calling `getUserMedia({audio:true})` first forces
+ *   a real permission prompt + a real Permission state, then we close
+ *   the stream and let SpeechRecognition open its own.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -25,8 +27,6 @@ interface SpeechResult {
   transcript: string;
 }
 
-// Minimal type for the browser SpeechRecognition class. The DOM lib
-// doesn't ship this yet in some TS configs; declare what we touch.
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
@@ -66,36 +66,21 @@ export function useVoiceInput(lang = "en-US") {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  // Start with `supported: true` so the mic button renders during SSR
-  // and the initial client render. The first useEffect flips it to
-  // false in unsupported browsers (Firefox today). The previous
-  // behavior — start false → flip true on hydrate — caused the button
-  // to be missing for the first few hundred ms of every page load
-  // even in browsers that DO support it.
+  // Start with `supported: true` so the mic button renders during the
+  // initial paint. The first useEffect flips it to false in
+  // unsupported browsers.
   const [supported, setSupported] = useState(true);
 
   useEffect(() => {
     setSupported(getRecognitionCtor() !== null);
   }, []);
 
-  const start = useCallback(
+  const beginRecognition = useCallback(
     (onResult: (r: SpeechResult) => void) => {
       const Ctor = getRecognitionCtor();
       if (!Ctor) {
         setError(
           "Voice input isn't supported in this browser. Try Chrome, Edge, or Safari.",
-        );
-        return;
-      }
-      // Web Speech API requires a secure context (HTTPS or localhost).
-      // Surface that explicitly so users don't burn time wondering why
-      // permissions never prompted.
-      if (
-        typeof window !== "undefined" &&
-        window.isSecureContext === false
-      ) {
-        setError(
-          "Voice input only works over HTTPS. Reload on the secure URL.",
         );
         return;
       }
@@ -123,11 +108,8 @@ export function useVoiceInput(lang = "en-US") {
           setError("No microphone found.");
         } else if (err === "network") {
           setError("Network error reaching the speech service.");
-        } else if (err === "aborted") {
-          // User stopped or a new session started; not an error worth
-          // showing.
-        } else if (err === "no-speech") {
-          // Silent — common on quiet rooms, not user-actionable.
+        } else if (err === "aborted" || err === "no-speech") {
+          // Silent — common during pauses, not user-actionable.
         } else if (err) {
           setError(`Voice input error: ${err}`);
         }
@@ -150,6 +132,51 @@ export function useVoiceInput(lang = "en-US") {
       }
     },
     [lang],
+  );
+
+  const start = useCallback(
+    (onResult: (r: SpeechResult) => void) => {
+      // Clear stale error from previous attempts — without this, a
+      // user who fixed their permission still saw "permission denied"
+      // until reload.
+      setError(null);
+      // Secure-context check. Web Speech requires HTTPS.
+      if (
+        typeof window !== "undefined" &&
+        window.isSecureContext === false
+      ) {
+        setError(
+          "Voice input only works over HTTPS. Reload on the secure URL.",
+        );
+        return;
+      }
+      // Force an explicit mic-permission prompt via getUserMedia,
+      // then start SpeechRecognition. Without this Edge can silently
+      // refuse without ever asking.
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.mediaDevices?.getUserMedia
+      ) {
+        navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then((stream) => {
+            stream.getTracks().forEach((t) => t.stop());
+            beginRecognition(onResult);
+          })
+          .catch((err: Error) => {
+            setError(
+              err.name === "NotAllowedError"
+                ? "Microphone permission denied. Click the lock icon in your address bar to allow."
+                : err.name === "NotFoundError"
+                  ? "No microphone found on this device."
+                  : `Mic error: ${err.message}`,
+            );
+          });
+        return;
+      }
+      beginRecognition(onResult);
+    },
+    [beginRecognition],
   );
 
   const stop = useCallback(() => {

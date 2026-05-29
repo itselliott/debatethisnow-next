@@ -55,14 +55,22 @@
   html {
     background: var(--color-paper);
     color: var(--color-ink);
+    /* Bumping the root font-size from the browser default (16px) up
+     * to 18px scales every rem-based Tailwind utility (padding,
+     * margin, gap, font sizes) by 12.5%. That brings the page in
+     * line with the user-tested zoom level (~115%) so the default
+     * "100%" view already breathes properly without anyone needing
+     * to manually zoom. */
+    font-size: 18px;
   }
 
   body {
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-body);
-    font-size: 17px;
-    line-height: 1.5;
+    /* Use rem now so body text scales with html — was 17px hard. */
+    font-size: 1rem;
+    line-height: 1.55;
     overflow-x: hidden;
     position: relative;
     z-index: 0;

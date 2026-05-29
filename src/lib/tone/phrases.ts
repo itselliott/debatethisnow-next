@@ -34,6 +34,8 @@ export type PhraseKey =
   | "dashboard_subtitle"
   | "cta_start"
   | "cta_start_sub"
+  | "cta_challenge"
+  | "cta_challenge_sub"
   | "cta_random"
   | "cta_random_sub"
   | "cta_showcase"
@@ -139,6 +141,26 @@ const PHRASES: Record<PhraseKey, Entry> = {
     es: {
       competitive: "Elige un tema, espera un oponente digno.",
       casual: "Elige un tema, te emparejamos con alguien.",
+    },
+  },
+  cta_challenge: {
+    en: {
+      competitive: "Challenge Someone",
+      casual: "Challenge a Friend",
+    },
+    es: {
+      competitive: "Desafiar a Alguien",
+      casual: "Reta a un Amigo",
+    },
+  },
+  cta_challenge_sub: {
+    en: {
+      competitive: "Pick a specific opponent. Set the topic. Send the gauntlet.",
+      casual: "Pick someone, set the topic, send them a challenge.",
+    },
+    es: {
+      competitive: "Elige a un rival. Define el tema. Lanza el reto.",
+      casual: "Elige a alguien, define el tema, mándale el reto.",
     },
   },
   cta_random: {

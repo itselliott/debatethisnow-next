@@ -21,6 +21,8 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SoundAmbience } from "@/components/SoundAmbience";
 import { ResumeDebateBanner } from "@/components/ResumeDebateBanner";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { MatchFoundRedirect } from "@/components/MatchFoundRedirect";
+import { RadioWidget } from "@/components/RadioWidget";
 import { useSidebarCollapsed } from "@/lib/hooks/use-sidebar";
 import { useTone } from "@/lib/hooks/use-tone";
 
@@ -55,6 +57,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
       <SoundAmbience />
       <ServiceWorkerRegistrar />
+      <MatchFoundRedirect />
+      <RadioWidget />
 
       {/* Floating expand button — desktop only, mounted when sidebar is
           collapsed. Mobile uses MobileBottomNav so this never shows there. */}

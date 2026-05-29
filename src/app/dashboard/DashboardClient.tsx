@@ -13,6 +13,7 @@ import {
   useTrendingTopics,
 } from "@/lib/hooks/use-dashboard";
 import { useDashboardOrder, type PanelId } from "@/lib/hooks/use-dashboard-order";
+import { OpenChallengeDialog } from "@/components/OpenChallengeDialog";
 import { apiClient } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DebateDict } from "@/lib/serializers/debate";
@@ -376,28 +377,32 @@ function ChallengesCard({
 
 function CtaTiles() {
   const { t } = useTone();
-  // Live queue size — pulled here so the two matchmaking tiles can
-  // both surface it. Refreshes every 15s via TanStack staleTime; also
+  // Live queue size — pulled here so the random matchmaking tile can
+  // surface it. Refreshes every 15s via TanStack staleTime; also
   // gets bumped by the socket `match_found` invalidator in
   // useDashboardLiveRefresh.
   const queue = useQueueSize();
   const size = queue.data?.queue_size ?? 0;
+  const [challengeOpen, setChallengeOpen] = useState(false);
 
   return (
     <section className="grid gap-4 sm:grid-cols-3">
-      <Link
-        href="/matchmaking"
-        className="relative rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
+      {/* Tile 1 — Challenge a specific person. Opens a search-and-
+          challenge dialog instead of dumping the user into matchmaking
+          (which was redundant with the Random tile). */}
+      <button
+        type="button"
+        onClick={() => setChallengeOpen(true)}
+        className="relative rounded border border-ink bg-paper-2 p-5 text-left shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
       >
-        <div className="flex items-center justify-between">
-          <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-            Start
-          </div>
-          <QueueBadge size={size} />
+        <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
+          Challenge
         </div>
-        <h3 className="mt-1 font-display text-xl">{t("cta_start")}</h3>
-        <p className="mt-2 text-sm text-sepia">{t("cta_start_sub")}</p>
-      </Link>
+        <h3 className="mt-1 font-display text-xl">{t("cta_challenge")}</h3>
+        <p className="mt-2 text-sm text-sepia">{t("cta_challenge_sub")}</p>
+      </button>
+
+      {/* Tile 2 — Random matchmaking queue. Shows queue size badge. */}
       <Link
         href="/matchmaking?random=1"
         className="relative rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
@@ -411,6 +416,8 @@ function CtaTiles() {
         <h3 className="mt-1 font-display text-xl">{t("cta_random")}</h3>
         <p className="mt-2 text-sm text-sepia">{t("cta_random_sub")}</p>
       </Link>
+
+      {/* Tile 3 — Watch bots. */}
       <Link
         href="/bots"
         className="rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
@@ -421,6 +428,10 @@ function CtaTiles() {
         <h3 className="mt-1 font-display text-xl">{t("cta_showcase")}</h3>
         <p className="mt-2 text-sm text-sepia">{t("cta_showcase_sub")}</p>
       </Link>
+
+      {challengeOpen ? (
+        <OpenChallengeDialog onClose={() => setChallengeOpen(false)} />
+      ) : null}
     </section>
   );
 }

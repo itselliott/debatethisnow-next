@@ -6,12 +6,20 @@
  * and routes the user to whatever the notification is about when they
  * click it.
  *
- * Per-kind formatter lives below — adding a new kind is one switch case
- * + (if the kind has a CTA target) one route mapping.
+ * For `challenge_received` notifications, the popover surfaces inline
+ * Accept / Decline buttons so the user can act without navigating to
+ * the dashboard. Accept POSTs to `/api/challenges/<id>/accept` and
+ * navigates to the new debate room; decline POSTs to the matching
+ * endpoint and just drops the row. Both are optimistic — the row
+ * disappears the moment you click, restored on error.
+ *
+ * Per-kind formatter lives below — adding a new kind is one switch
+ * case + (if the kind has a CTA target) one route mapping.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useMarkAllRead,
   useMarkRead,
@@ -20,6 +28,7 @@ import {
   useUnreadCount,
 } from "@/lib/hooks/use-notifications";
 import { useTone } from "@/lib/hooks/use-tone";
+import { apiClient, ApiError } from "@/lib/api-client";
 import type { NotificationDict } from "@/lib/serializers/notification";
 
 export function NotificationCenter() {
@@ -31,8 +40,11 @@ export function NotificationCenter() {
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
   const router = useRouter();
+  const qc = useQueryClient();
 
   const [open, setOpen] = useState(false);
+  const [actingOn, setActingOn] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Close on click-outside + Escape.
@@ -63,6 +75,96 @@ export function NotificationCenter() {
       if (href) router.push(href);
     },
     [markRead, router],
+  );
+
+  // Drop a single notification from the cached list — optimistic UI
+  // when the user accepts/declines. Returns a snapshot so the caller
+  // can restore on error.
+  const dropFromList = useCallback(
+    (notificationId: number) => {
+      const keys = [
+        ["notifications", "list", 20],
+        ["notifications", "unread-count"],
+      ];
+      const snapshots = keys.map((k) => [k, qc.getQueryData(k)] as const);
+      qc.setQueryData<{ notifications: NotificationDict[]; unread_count: number }>(
+        ["notifications", "list", 20],
+        (old) =>
+          old
+            ? {
+                ...old,
+                notifications: old.notifications.filter(
+                  (x) => x.id !== notificationId,
+                ),
+                unread_count: Math.max(
+                  0,
+                  (old.unread_count ?? 0) -
+                    (old.notifications.find((x) => x.id === notificationId)
+                      ?.read === false
+                      ? 1
+                      : 0),
+                ),
+              }
+            : old,
+      );
+      return snapshots;
+    },
+    [qc],
+  );
+
+  const acceptChallenge = useCallback(
+    async (n: NotificationDict, challengeId: number) => {
+      setActingOn(n.id);
+      setActionError(null);
+      const snapshots = dropFromList(n.id);
+      try {
+        const res = await apiClient.post<{ debate_id: number }>(
+          `/api/challenges/${challengeId}/accept`,
+        );
+        // Background refresh of the dashboard inbox cache so the
+        // ChallengesCard there is consistent too.
+        void qc.invalidateQueries({
+          queryKey: ["dashboard", "challenges-inbox"],
+        });
+        setOpen(false);
+        router.push(`/debate/${res.debate_id}`);
+      } catch (err) {
+        // Roll back the optimistic remove.
+        for (const [k, v] of snapshots) qc.setQueryData(k, v);
+        setActionError(
+          err instanceof ApiError
+            ? ((err.data as { message?: string } | null)?.message ?? err.message)
+            : "Couldn't accept the challenge.",
+        );
+      } finally {
+        setActingOn(null);
+      }
+    },
+    [dropFromList, qc, router],
+  );
+
+  const declineChallenge = useCallback(
+    async (n: NotificationDict, challengeId: number) => {
+      setActingOn(n.id);
+      setActionError(null);
+      const snapshots = dropFromList(n.id);
+      try {
+        await apiClient.post(`/api/challenges/${challengeId}/decline`);
+        void qc.invalidateQueries({
+          queryKey: ["dashboard", "challenges-inbox"],
+        });
+      } catch (err) {
+        for (const [k, v] of snapshots) qc.setQueryData(k, v);
+        setActionError(
+          err instanceof ApiError
+            ? ((err.data as { message?: string } | null)?.message ?? err.message)
+            : "Couldn't decline the challenge.",
+        );
+      } finally {
+        setActingOn(null);
+      }
+    },
+    [dropFromList, qc],
   );
 
   const unreadCount = unread.data?.unread_count ?? 0;
@@ -96,7 +198,7 @@ export function NotificationCenter() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute bottom-full left-0 z-50 mb-2 w-[300px] rounded border-2 border-ink bg-paper text-ink shadow-press"
+          className="absolute bottom-full left-0 z-50 mb-2 w-[320px] rounded border-2 border-ink bg-paper text-ink shadow-press"
         >
           <div className="flex items-center justify-between border-b border-ink px-3 py-2">
             <span className="font-condensed text-xs uppercase tracking-wider text-sepia">
@@ -113,7 +215,15 @@ export function NotificationCenter() {
               </button>
             ) : null}
           </div>
-          <ul className="max-h-[360px] overflow-y-auto">
+          {actionError ? (
+            <div
+              role="alert"
+              className="border-b border-red bg-red/10 px-3 py-2 text-xs text-red-dark"
+            >
+              {actionError}
+            </div>
+          ) : null}
+          <ul className="max-h-[400px] overflow-y-auto">
             {list.isLoading ? (
               <li className="px-3 py-4 text-center text-sm text-sepia">
                 Loading…
@@ -124,36 +234,74 @@ export function NotificationCenter() {
                 will land here.
               </li>
             ) : (
-              items.map((n) => (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => onItemClick(n)}
-                    className={`block w-full border-b border-ink/10 px-3 py-2 text-left transition-colors hover:bg-paper-2 ${
-                      n.read ? "" : "bg-gold/10"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      {!n.read ? (
-                        <span
-                          aria-hidden
-                          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red"
-                        />
-                      ) : (
-                        <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0" />
-                      )}
-                      <div className="flex-1">
-                        <div className="text-sm leading-snug text-ink">
-                          {formatBody(n)}
+              items.map((n) => {
+                const challengeId =
+                  n.kind === "challenge_received"
+                    ? pickNumber(n.payload, "challenge_id")
+                    : null;
+                const showActions = challengeId !== null;
+                const acting = actingOn === n.id;
+                return (
+                  <li key={n.id} className="border-b border-ink/10">
+                    <div
+                      className={`flex w-full items-start gap-2 px-3 py-2 transition-colors ${
+                        n.read ? "" : "bg-gold/10"
+                      } ${showActions ? "" : "hover:bg-paper-2"}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (acting) return;
+                          if (!showActions) onItemClick(n);
+                          else if (!n.read) markRead.mutate(n.id);
+                        }}
+                        className="flex flex-1 items-start gap-2 text-left"
+                      >
+                        {!n.read ? (
+                          <span
+                            aria-hidden
+                            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red"
+                          />
+                        ) : (
+                          <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0" />
+                        )}
+                        <div className="flex-1">
+                          <div className="text-sm leading-snug text-ink">
+                            {formatBody(n)}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-sepia">
+                            {timeAgo(n.created_at)}
+                          </div>
                         </div>
-                        <div className="mt-0.5 text-[11px] text-sepia">
-                          {timeAgo(n.created_at)}
-                        </div>
-                      </div>
+                      </button>
                     </div>
-                  </button>
-                </li>
-              ))
+                    {showActions && challengeId !== null ? (
+                      // Inline accept/decline. Replaces the "navigate
+                      // to dashboard" flow for challenge_received —
+                      // user can act in one click without leaving
+                      // their current page.
+                      <div className="flex gap-2 border-t border-ink/10 bg-paper-2 px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => acceptChallenge(n, challengeId)}
+                          disabled={acting}
+                          className="flex-1 rounded bg-green-action px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper hover:opacity-90 disabled:opacity-50"
+                        >
+                          {acting ? "…" : "Accept ▸"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => declineChallenge(n, challengeId)}
+                          disabled={acting}
+                          className="rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper disabled:opacity-50"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })
             )}
           </ul>
           <div className="border-t border-ink px-3 py-2 text-center">
@@ -270,15 +418,16 @@ function ctaHref(n: NotificationDict): string | null {
   switch (n.kind) {
     // All friend-relationship notifications route to /friends — that's
     // where incoming requests are accepted/declined and the list of
-    // current friends lives. Sending the user to /dashboard for a
-    // friend_request was wrong; the dashboard doesn't surface a way to
-    // act on it.
+    // current friends lives.
     case "friend_request":
     case "friend_accepted":
     case "friend_declined":
       return "/friends";
+    // challenge_received is handled inline (Accept / Decline buttons
+    // on the notification row itself) — so clicking the body is a
+    // no-op rather than a navigation. Return null to skip routing.
     case "challenge_received":
-      return "/dashboard";
+      return null;
     case "challenge_accepted": {
       const id = pickNumber(p, "debate_id");
       return id !== null ? `/debate/${id}` : "/dashboard";
