@@ -28,33 +28,41 @@
  */
 
 @theme inline {
-  /* Paper / ink — cream parchment + deep navy text. */
-  --color-paper: #FFFDEB;
-  --color-paper-2: #FFFAE0;
-  --color-paper-3: #E8DBB3;
-  --color-paper-4: #C9B888;
-  --color-ink: #1A2842;
-  --color-ink-soft: #2C3F5E;
-  --color-sepia: #6B5A36;
-  --color-muted-ink: #8A7649;
+  /* Americana palette — cream / navy / coral-red / mustard-gold /
+   * federal-blue. Sourced from the user-specified light palette:
+   *   #ffefdb cream      — main body
+   *   #ffe4b8 warm tan   — secondary surface
+   *   #d9534f coral red  — action
+   *   #ffbe4f mustard    — gold accent
+   *   #0c457d navy       — text + sidebar
+   *   #428bca sky blue   — info chip
+   */
+  --color-paper: #ffefdb;
+  --color-paper-2: #fff7ea;
+  --color-paper-3: #ffe4b8;
+  --color-paper-4: #ffce82;
+  --color-ink: #0c457d;
+  --color-ink-soft: #1a5a93;
+  --color-sepia: #8b6d3e;
+  --color-muted-ink: #b08d52;
 
   /* Action colors — red and gold are brand-stable across themes. */
-  --color-red: #CE2626;
-  --color-red-dark: #A01818;
-  --color-gold: #D4A017;
-  --color-gold-dark: #A87F10;
-  --color-navy: #1A2842;
+  --color-red: #d9534f;
+  --color-red-dark: #b03a35;
+  --color-gold: #ffbe4f;
+  --color-gold-dark: #e09e2c;
+  --color-navy: #0c457d;
   --color-green-action: #4A7C3A;
-  /* Sky-blue accent — for info/highlight chips. */
-  --color-blue-accent: #7DAACB;
+  /* Sky-blue accent — federal-blue mid-tone. */
+  --color-blue-accent: #428bca;
 
-  /* Letterpress-shadow color. Swaps to near-black in dark mode so
-   * shadows stay readable against dark cards. */
-  --color-shadow: #1A2842;
+  /* Letterpress-shadow color. Navy on cream in light; flips to near-
+   * black on the dark navy/olive scheme in dark mode. */
+  --color-shadow: #0c457d;
   /* Halftone-dot overlay color + blend mode for the body::before
    * texture. Inverted in dark mode so the dotted noise stays visible
    * against the darker background. */
-  --halftone-color: rgba(26, 40, 66, 0.035);
+  --halftone-color: rgba(12, 69, 125, 0.035);
   --halftone-blend: multiply;
 
   /* Semantic aliases used in main.css */
@@ -69,35 +77,36 @@
 }
 
 /*
- * Dark theme — activated by setting `data-theme="dark"` on the <html>
- * element (via `useTheme` hook).
+ * Dark theme — "American Camo Navy" palette per user request. The
+ * sidebar is a dark olive (#616140), the main body is federal navy
+ * (#102245), text is pure white. Reads like a military-academic
+ * jacket — olive ribbon over a navy field.
  *
- * Approach: override Tailwind utility CLASSES directly (not the
- * `--color-paper` etc. tokens) so the same token can serve as "light
- * text" via `text-paper` AND "dark body surface" via `bg-paper`. If we
- * swapped the variable, both would flip together — which is what broke
- * the sidebar (text-paper went dark on a still-dark bg-navy) and the
- * end-of-debate modal (bg-ink/70 backdrop went CREAM, washing out the
- * whole modal).
+ * Token strategy unchanged from before: keep paper/ink/navy/red/gold
+ * STABLE across themes (so text-paper on bg-navy still works), and
+ * override the utility CLASSES in dark mode. Same fix that resolved
+ * the bg-ink/70 modal wash-out and sidebar invisible-text bugs.
  *
- * WCAG-tuned dark palette (research-backed):
- *   bg-body     #0E1828  warm midnight
- *   bg-card     #1A2438  raised surface  (≈14.9:1 vs cream text)
- *   bg-raised   #212B40  hover/elevated
- *   bg-modal    #2A3449  modal/menu
- *   text-prim   #F2EBD7  warm cream  (14.9:1 on body)
- *   text-muted  #C9BFA3  (~9:1)
- *   border      #3A4258  (3.1:1 — WCAG non-text min)
- *   red-accent  #E85A4F  (5.8:1 — brand red, lifted)
- *   blue-accent #9CC4DF  (8.1:1 — sky blue, lifted)
- *   gold-accent #E8B833  (brand gold, lifted)
+ * Palette:
+ *   body         #102245  federal navy (main area)
+ *   card         #1a2d56  +1 elevation
+ *   raised       #243968  +2 elevation
+ *   modal        #2e447b  +3 elevation
+ *   sidebar      #616140  dark olive (bg-navy override — key change)
+ *   sidebar-hov  #757554  olive hover state (bg-ink-soft override)
+ *   text         #ffffff  white  (~16:1 vs body)
+ *   text-sec     #e2e2d3  off-white  (light olive)
+ *   text-mute    #999966  medium olive  (~5:1 vs body — AA)
+ *   border       #616140  olive (matches sidebar)
+ *   border-soft  #4a4a32  deeper olive
+ *   red          #f06b67  lifted coral
+ *   gold         #ffd175  lifted mustard
  */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  /* Shadows stay near-black for proper contrast against dark cards. */
   --color-shadow: #000;
-  /* Halftone inverted — light dots × screen instead of dark dots × multiply. */
-  --halftone-color: rgba(242, 235, 215, 0.04);
+  /* Halftone inverted — light cream dots × screen on the navy body. */
+  --halftone-color: rgba(255, 255, 255, 0.035);
   --halftone-blend: screen;
 }
 
@@ -105,51 +114,60 @@
  * utility class. */
 :root[data-theme="dark"] html,
 :root[data-theme="dark"] body {
-  background: #0E1828;
-  color: #F2EBD7;
+  background: #102245;
+  color: #ffffff;
 }
 
-/* Card / section / overlay backgrounds — invert to dark with
- * Material-style elevation (cards LIGHTER than body). */
-:root[data-theme="dark"] .bg-paper { background-color: #0E1828; }
-:root[data-theme="dark"] .bg-paper-2 { background-color: #1A2438; }
-:root[data-theme="dark"] .bg-paper-3 { background-color: #212B40; }
-:root[data-theme="dark"] .bg-paper-4 { background-color: #2A3449; }
+/* Card / section / overlay backgrounds — Material-style elevation
+ * (cards LIGHTER than body), all in the federal-navy family. */
+:root[data-theme="dark"] .bg-paper { background-color: #102245; }
+:root[data-theme="dark"] .bg-paper-2 { background-color: #1a2d56; }
+:root[data-theme="dark"] .bg-paper-3 { background-color: #243968; }
+:root[data-theme="dark"] .bg-paper-4 { background-color: #2e447b; }
 
-/* Body / heading text — invert to cream. text-ink is used as "dark
- * text on light surface" everywhere; flips cleanly to "cream on dark
- * surface" in dark mode without any other side effects. */
-:root[data-theme="dark"] .text-ink { color: #F2EBD7; }
-:root[data-theme="dark"] .text-ink-soft { color: #C8BFA5; }
-:root[data-theme="dark"] .text-sepia { color: #B8A98A; }
-:root[data-theme="dark"] .text-muted-ink { color: #9D9075; }
+/* Sidebar / brand-navy surfaces — override to dark olive. This is
+ * the big visual cue between themes: cream paper + navy sidebar in
+ * light, navy main + olive sidebar in dark. */
+:root[data-theme="dark"] .bg-navy { background-color: #616140; }
+/* bg-ink-soft is used as the sidebar nav-item hover background.
+ * Lift to a slightly brighter olive so the hover is visible against
+ * the olive bar. */
+:root[data-theme="dark"] .bg-ink-soft { background-color: #757554; }
 
-/* Borders — lift to a mid-tone navy so they're visible against the
- * dark body. WCAG 1.4.11 min for non-text is 3:1; #3A4258 hits ~3.1:1. */
-:root[data-theme="dark"] .border-ink { border-color: #3A4258; }
-:root[data-theme="dark"] .border-ink-soft { border-color: #2F4470; }
+/* Body / heading text — flip to white. text-ink is used as "dark
+ * text on light surface" everywhere; cleanly inverts to "white on
+ * dark surface" in dark mode. */
+:root[data-theme="dark"] .text-ink { color: #ffffff; }
+:root[data-theme="dark"] .text-ink-soft { color: #e2e2d3; }
+:root[data-theme="dark"] .text-sepia { color: #999966; }
+:root[data-theme="dark"] .text-muted-ink { color: #b3b380; }
+
+/* Borders — olive, matches the sidebar. Pops against the navy body
+ * surfaces (~5:1) and reads as a tonal divider, not a stroke. */
+:root[data-theme="dark"] .border-ink { border-color: #616140; }
+:root[data-theme="dark"] .border-ink-soft { border-color: #4a4a32; }
 :root[data-theme="dark"] .border-t-ink,
 :root[data-theme="dark"] .border-b-ink,
 :root[data-theme="dark"] .border-l-ink,
-:root[data-theme="dark"] .border-r-ink { border-color: #3A4258; }
+:root[data-theme="dark"] .border-r-ink { border-color: #616140; }
 
 /* Border with opacity — used in result page, etc. */
-:root[data-theme="dark"] [class*="border-ink\/"] { border-color: rgba(58, 66, 88, 0.6); }
+:root[data-theme="dark"] [class*="border-ink\/"] { border-color: rgba(97, 97, 64, 0.6); }
 
-/* Modal scrim — bg-ink/N becomes BLACK in dark mode (was inverting to
- * a cream overlay because --color-ink was getting swapped — root cause
- * of the end-screen modal wash-out). */
+/* Modal scrim — bg-ink/N becomes BLACK in dark mode (was inverting
+ * to a cream overlay because --color-ink was getting swapped — root
+ * cause of the end-screen modal wash-out we fixed earlier). */
 :root[data-theme="dark"] .bg-ink\/70 { background-color: rgba(0, 0, 0, 0.7); }
 :root[data-theme="dark"] .bg-ink\/60 { background-color: rgba(0, 0, 0, 0.6); }
 :root[data-theme="dark"] .bg-ink\/50 { background-color: rgba(0, 0, 0, 0.5); }
 :root[data-theme="dark"] .bg-ink\/40 { background-color: rgba(0, 0, 0, 0.4); }
 :root[data-theme="dark"] .bg-ink\/30 { background-color: rgba(0, 0, 0, 0.3); }
 
-/* Brighten action colors for dark — the WCAG-derived lifts. */
-:root[data-theme="dark"] .text-red { color: #E85A4F; }
-:root[data-theme="dark"] .text-red-dark { color: #C4282E; }
-:root[data-theme="dark"] .text-gold { color: #E8B833; }
-:root[data-theme="dark"] .text-gold-dark { color: #C49918; }
+/* Brighten action colors so they remain readable on the dark navy. */
+:root[data-theme="dark"] .text-red { color: #f06b67; }
+:root[data-theme="dark"] .text-red-dark { color: #d9534f; }
+:root[data-theme="dark"] .text-gold { color: #ffd175; }
+:root[data-theme="dark"] .text-gold-dark { color: #ffbe4f; }
 :root[data-theme="dark"] .text-green-action { color: #6FBC5A; }
 
 /* Background versions: bg-red and bg-gold stay brand-stable so buttons
@@ -369,12 +387,12 @@
   box-shadow: none;
 }
 
-/* Dark-mode CTA box — match the inverted card surface. */
+/* Dark-mode CTA box — match the federal-navy card surface. */
 :root[data-theme="dark"] .cta-inline {
-  background: #1A2438;
-  border-color: #3A4258;
+  background: #1a2d56;
+  border-color: #616140;
   box-shadow: 4px 4px 0 #000;
 }
 :root[data-theme="dark"] .cta-inline p {
-  color: #F2EBD7;
+  color: #ffffff;
 }

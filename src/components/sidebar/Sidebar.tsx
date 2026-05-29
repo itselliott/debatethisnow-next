@@ -222,15 +222,59 @@ function SidebarFooter() {
         </div>
       )}
 
-      <div className="flex gap-3 text-[11px] text-paper-3">
+      <div className="flex items-center gap-3 text-[11px] text-paper-3">
         <Link href="/terms" className="hover:text-gold">
           {t("nav_terms")}
         </Link>
+        {/* Small Old-Glory between Terms and Privacy. SVG inline so it
+         * doesn't depend on an external asset and renders at any
+         * zoom level without aliasing. Decorative — aria-hidden. */}
+        <FlagUSA className="h-2.5 w-auto shrink-0" />
         <Link href="/privacy" className="hover:text-gold">
           {t("nav_privacy")}
         </Link>
       </div>
     </div>
+  );
+}
+
+/**
+ * Tiny inline US flag. Stylised: full 13 stripes, a blue canton in
+ * the proper 7-stripe height, and a 5×4 grid of dots standing in for
+ * the 50 stars (which would alias to noise at this size). At ~10–14px
+ * tall the eye still parses it as Old Glory.
+ */
+function FlagUSA({ className = "" }: { className?: string }) {
+  // 13-stripe geometry. Canton covers stripes 1–7 (top 7/13 of height)
+  // and 0.4 of the width per official spec.
+  const STRIPE_H = 20 / 13;
+  return (
+    <svg
+      viewBox="0 0 38 20"
+      role="img"
+      aria-label="United States flag"
+      className={className}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Solid red base; white stripes drawn on top at odd indexes. */}
+      <rect width="38" height="20" fill="#d9534f" />
+      <g fill="#ffffff">
+        {[1, 3, 5, 7, 9, 11].map((i) => (
+          <rect key={i} y={i * STRIPE_H} width="38" height={STRIPE_H} />
+        ))}
+      </g>
+      {/* Blue canton. */}
+      <rect width="15.2" height={STRIPE_H * 7} fill="#0c457d" />
+      {/* Stars suggested by a 5×4 grid of dots — enough density to
+       * read as a starfield without aliasing into noise. */}
+      <g fill="#ffffff">
+        {[1.5, 4.3, 7.1, 9.9, 12.7].map((x) =>
+          [1.5, 3.3, 5.1, 6.9, 8.7].map((y) => (
+            <circle key={`${x}-${y}`} cx={x} cy={y} r="0.55" />
+          )),
+        )}
+      </g>
+    </svg>
   );
 }
 

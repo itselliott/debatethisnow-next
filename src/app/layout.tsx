@@ -46,8 +46,8 @@ export const viewport: Viewport = {
   // Per-color-scheme theme colors so iOS Safari's URL bar tints to
   // match whichever theme is active.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf7f0" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1814" },
+    { media: "(prefers-color-scheme: light)", color: "#ffefdb" },
+    { media: "(prefers-color-scheme: dark)", color: "#102245" },
   ],
 };
 
