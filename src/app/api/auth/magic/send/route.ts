@@ -20,6 +20,7 @@ import {
 import { rateCheck, clientIp } from "@/lib/rate-limit";
 import { signMagicToken } from "@/lib/auth/magic";
 import { magicLinkEmail, sendEmail } from "@/lib/email";
+import { env } from "@/lib/env";
 
 const Body = z.object({ email: z.string().email() });
 
@@ -49,22 +50,56 @@ export async function POST(req: NextRequest) {
 
   // Look up — but don't reveal whether we found anything.
   const user = await prisma.user.findUnique({ where: { email } });
+  let dispatched: "resend" | "console" | "none" = "none";
+  let devLink: string | null = null;
   if (user && !user.is_banned) {
     try {
       const token = await signMagicToken(email);
-      await sendEmail(magicLinkEmail({ to: email, token }));
+      const result = await sendEmail(magicLinkEmail({ to: email, token }));
+      dispatched = result.via;
+      // Only in DEV_MODE do we surface the link in the JSON response
+      // (and only when no real email provider was used). This lets a
+      // developer test the magic-link flow locally without Resend.
+      // In production, even when sendEmail logs to console, the user
+      // gets the same generic success message — never the link.
+      if (env.DEV_MODE && result.via === "console") {
+        const baseUrl =
+          env.NEXT_PUBLIC_BASE_URL ?? "https://debatethisnow.com";
+        devLink = `${baseUrl}/auth/magic?token=${encodeURIComponent(token)}`;
+      }
     } catch (err) {
       console.warn(
         "[magic-send] dispatch failed:",
         err instanceof Error ? err.message : err,
       );
-      // Still return 200 — don't leak whether the user exists.
     }
+  }
+
+  // Critical: when no email provider is configured at all, we cannot
+  // pretend to have sent the email. Surface a clear 503 in production
+  // so operators notice the misconfiguration rather than wondering
+  // why no inbox is hearing from us. The user-facing message stays
+  // generic; the `email_unavailable` code is for the operator + their
+  // monitoring.
+  if (!env.RESEND_API_KEY && !env.DEV_MODE) {
+    return NextResponse.json(
+      {
+        error: "email_unavailable",
+        message:
+          "Magic-link sign-in isn't available right now. Use your password to sign in instead.",
+      },
+      { status: 503 },
+    );
   }
 
   // Consistent response regardless of whether the email exists.
   return NextResponse.json({
     ok: true,
     message: "If an account exists for that email, we sent a sign-in link.",
+    // Only populated when DEV_MODE is on AND no real email provider
+    // ran. Empty in production. Lets local dev grab the link without
+    // checking server logs.
+    dev_link: devLink,
+    dispatched,
   });
 }

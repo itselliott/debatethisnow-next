@@ -170,15 +170,15 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
             {results.map((r) => (
               <li
                 key={r.id}
-                className="flex items-center justify-between rounded border border-ink bg-paper p-2"
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-ink bg-paper p-2"
               >
-                <div>
-                  <div className="font-display">{r.username}</div>
-                  <div className="text-xs text-sepia">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-display">{r.username}</div>
+                  <div className="truncate text-xs text-sepia">
                     Elo {r.elo_rating} · {r.rank_tier}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
                     onClick={() => setChallengeTarget(r.username)}
@@ -215,12 +215,12 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
               {(requests.data?.incoming ?? []).map((fr) => (
                 <li
                   key={fr.id}
-                  className="flex items-center justify-between rounded border border-ink bg-paper p-2"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-ink bg-paper p-2"
                 >
-                  <span className="font-display">
+                  <span className="min-w-0 flex-1 truncate font-display">
                     {fr.requester?.username ?? "?"}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     <button
                       type="button"
                       onClick={() => accept(fr.id)}
@@ -249,15 +249,15 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
               {(requests.data?.outgoing ?? []).map((fr) => (
                 <li
                   key={fr.id}
-                  className="flex items-center justify-between rounded border border-ink bg-paper p-2"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-ink bg-paper p-2"
                 >
-                  <span className="font-display">
+                  <span className="min-w-0 flex-1 truncate font-display">
                     {fr.target?.username ?? "?"}
                   </span>
                   <button
                     type="button"
                     onClick={() => remove(fr.id)}
-                    className="rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"
+                    className="shrink-0 rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"
                   >
                     Cancel
                   </button>
@@ -285,12 +285,17 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
             {(friends.data?.friends ?? []).map((fr) => (
               <li
                 key={fr.id}
-                className="flex items-center justify-between rounded border border-ink bg-paper p-2"
+                // `gap-2 min-w-0` on the flex container + `truncate
+                // min-w-0` on the name span are what prevent the
+                // username from pushing the buttons off-row at high
+                // zoom / narrow widths. flex-wrap kicks the buttons
+                // onto a second line on very small screens.
+                className="flex flex-wrap items-center justify-between gap-2 rounded border border-ink bg-paper p-2"
               >
-                <span className="font-display">
+                <span className="min-w-0 flex-1 truncate font-display text-base">
                   {fr.friend?.username ?? "?"}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
                     onClick={() => {

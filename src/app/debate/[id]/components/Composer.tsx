@@ -220,29 +220,35 @@ export function Composer({
         </div>
       ) : null}
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        {voice.supported ? (
-          <button
-            type="button"
-            onClick={toggleVoice}
-            disabled={!isMyTurn}
-            aria-pressed={voice.listening}
-            title={
-              voice.listening
+        {/* Voice button always renders. If the browser doesn't support
+            Web Speech API (Firefox) or permission was denied, the
+            button surfaces the reason inline rather than disappearing
+            silently — disappearing was the previous bug, where users
+            assumed "voice doesn't work" when actually the button just
+            wasn't being drawn. */}
+        <button
+          type="button"
+          onClick={toggleVoice}
+          disabled={!isMyTurn || !voice.supported}
+          aria-pressed={voice.listening}
+          title={
+            !voice.supported
+              ? "Voice input isn't supported in this browser (try Chrome, Edge, or Safari)"
+              : voice.listening
                 ? "Stop voice input"
                 : "Dictate your argument — uses your microphone"
-            }
-            className={`rounded border-2 px-3 py-2 font-condensed text-xs uppercase tracking-wider shadow-press-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-              voice.listening
-                ? "border-red bg-red text-paper"
-                : "border-ink bg-paper text-ink hover:bg-ink hover:text-paper"
-            }`}
-          >
-            <span aria-hidden className="mr-1">
-              {voice.listening ? "●" : "🎙"}
-            </span>
-            {voice.listening ? "Listening" : "Speak"}
-          </button>
-        ) : null}
+          }
+          className={`rounded border-2 px-3 py-2 font-condensed text-xs uppercase tracking-wider shadow-press-sm disabled:cursor-not-allowed disabled:opacity-50 ${
+            voice.listening
+              ? "border-red bg-red text-paper"
+              : "border-ink bg-paper text-ink hover:bg-ink hover:text-paper"
+          }`}
+        >
+          <span aria-hidden className="mr-1">
+            {voice.listening ? "●" : "🎙"}
+          </span>
+          {voice.listening ? "Listening" : voice.supported ? "Speak" : "Speak (not supported)"}
+        </button>
         <button
           type="button"
           disabled={!isMyTurn || wc < MIN_WORDS || wc > MAX_WORDS}

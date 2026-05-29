@@ -56,6 +56,12 @@ export interface DebateStoreState {
   votedReceiptVisible: boolean;
   typingFor: { userId: number; words: number } | null;
   endScreenVisible: boolean;
+  // Countdown to round-start. Set when the server emits `match_ready`
+  // (after both participants have joined the room); ticked down each
+  // second by the room's tick driver; cleared at 0. The countdown
+  // card hides itself when this is null.
+  matchCountdown: number | null;
+  matchCountdownDeadline: number | null;
 
   // ---- mutations ----
   setState(state: DebateDict, my_role?: string, my_vote?: number | null, spectator_count?: number): void;
@@ -67,6 +73,8 @@ export interface DebateStoreState {
   setTyping(t: { userId: number; words: number } | null): void;
   setSpectatorCount(n: number): void;
   setVoteReceiptVisible(v: boolean): void;
+  /** Start the round-start countdown (seconds from now). */
+  setMatchCountdown(seconds: number): void;
   /** Re-compute secondsRemaining from the current turn_deadline. */
   tick(): void;
 }
@@ -117,6 +125,8 @@ export function createDebateStore(debateId: number) {
     votedReceiptVisible: false,
     typingFor: null,
     endScreenVisible: false,
+    matchCountdown: null,
+    matchCountdownDeadline: null,
 
     setState(state, my_role, my_vote, spectator_count) {
       set({
@@ -168,9 +178,25 @@ export function createDebateStore(debateId: number) {
     setVoteReceiptVisible(v) {
       set({ votedReceiptVisible: v });
     },
+    setMatchCountdown(seconds) {
+      const deadline = Date.now() + seconds * 1000;
+      set({ matchCountdown: seconds, matchCountdownDeadline: deadline });
+    },
     tick() {
-      const { state } = get();
-      set({ secondsRemaining: computeSecondsRemaining(state) });
+      const { state, matchCountdownDeadline } = get();
+      const next: Partial<DebateStoreState> = {
+        secondsRemaining: computeSecondsRemaining(state),
+      };
+      if (matchCountdownDeadline !== null) {
+        const remainingMs = matchCountdownDeadline - Date.now();
+        if (remainingMs <= 0) {
+          next.matchCountdown = null;
+          next.matchCountdownDeadline = null;
+        } else {
+          next.matchCountdown = Math.ceil(remainingMs / 1000);
+        }
+      }
+      set(next);
     },
   }));
 }

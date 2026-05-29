@@ -28,7 +28,14 @@ interface SendResult {
 async function sendViaResend(input: SendEmailInput): Promise<SendResult> {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) return { ok: false, via: "console", error: "no-api-key" };
-  const from = env.RESEND_FROM_EMAIL ?? "DebateThis <hello@debatethisnow.com>";
+  // Default FROM falls back to Resend's pre-verified testing domain
+  // (`onboarding@resend.dev`) so the system at least *works* before
+  // domain verification is set up. Caveat: Resend's free tier only
+  // delivers email from that domain to the account owner's address.
+  // For real users, the operator MUST verify their own domain in
+  // Resend and set `RESEND_FROM_EMAIL` to a sender on that domain.
+  const from =
+    env.RESEND_FROM_EMAIL ?? "DebateThis <onboarding@resend.dev>";
   try {
     const r = await fetch(RESEND_URL, {
       method: "POST",
@@ -46,10 +53,19 @@ async function sendViaResend(input: SendEmailInput): Promise<SendResult> {
     });
     if (!r.ok) {
       const body = await r.text().catch(() => "");
-      console.warn(
-        `[email] Resend returned ${r.status}: ${body.slice(0, 200)}`,
-      );
-      return { ok: false, via: "resend", error: `HTTP ${r.status}` };
+      // Parse Resend's structured error so the API route can pass
+      // the specific reason (domain_not_verified, invalid_from, etc.)
+      // back to the caller instead of a generic "we failed".
+      let reason = `HTTP ${r.status}`;
+      try {
+        const parsed = JSON.parse(body) as { message?: string; name?: string };
+        if (parsed.message) reason = parsed.message;
+        if (parsed.name) reason = `${parsed.name}: ${parsed.message ?? ""}`.trim();
+      } catch {
+        if (body) reason = body.slice(0, 200);
+      }
+      console.warn(`[email] Resend rejected: ${reason}`);
+      return { ok: false, via: "resend", error: reason };
     }
     return { ok: true, via: "resend" };
   } catch (err) {

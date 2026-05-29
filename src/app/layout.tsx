@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bevan, Oswald, Lora, Special_Elite } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/providers/AppProviders";
@@ -31,6 +31,20 @@ const specialElite = Special_Elite({
 });
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://debatethisnow.com";
+
+// Viewport: explicit width-device + initial-scale 1 is the modern
+// default. `viewport-fit=cover` lets us draw under iOS notches /
+// home-indicators so the safe-area-inset padding on the bottom nav
+// actually has something to push against. `interactiveWidget: resizes-
+// content` keeps the iOS keyboard from cropping the textarea instead
+// of just sliding the viewport up.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#faf7f0",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),

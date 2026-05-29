@@ -45,11 +45,28 @@ export function LoginForm() {
     setMagicError(null);
     setMagicSending(true);
     try {
-      await apiClient.post("/api/auth/magic/send", { email });
+      const res = await apiClient.post<{
+        dev_link?: string | null;
+        dispatched?: string;
+      }>("/api/auth/magic/send", { email });
+      // In DEV_MODE without an email provider, the server returns the
+      // link in the response. Surface it inline so local dev can click
+      // through without rummaging in logs. In production this is
+      // always null + the user gets the generic "check your email".
+      if (res.dev_link) {
+        window.location.href = res.dev_link;
+        return;
+      }
       setMagicSent(true);
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
         setMagicError("Too many requests. Try again in a minute.");
+      } else if (err instanceof ApiError && err.status === 503) {
+        const data = err.data as { message?: string } | null;
+        setMagicError(
+          data?.message ??
+            "Magic-link sign-in isn't available right now. Use your password to sign in instead.",
+        );
       } else {
         setMagicError("Couldn't send the link. Try again.");
       }

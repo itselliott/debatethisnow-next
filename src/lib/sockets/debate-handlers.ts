@@ -28,6 +28,7 @@ import { isBlockedEitherWay } from "@/lib/services/block-service";
 import { userFromHandlerPayload } from "@/lib/sockets/auth";
 import { rateLimited } from "@/lib/sockets/rate-limit";
 import {
+  participantsInRoom,
   trackRoomJoin,
   untrackSid,
 } from "@/lib/sockets/state";
@@ -174,9 +175,26 @@ async function onJoinDebate(
   }
   await socket.join(debateRoom(d.id));
 
-  // Kick off turn timer when a participant joins and no timer is set —
-  // server-restart recovery for human-involved debates. Showcase debates
-  // run without a timer.
+  // Track presence FIRST so the both-ready check below sees this
+  // socket. (Order matters — the previous block called trackRoomJoin
+  // AFTER the start-turn logic, which meant a self-check couldn't
+  // see itself.)
+  const count = trackRoomJoin(socket.id, d.id, user.id, !isParticipant);
+  if (isParticipant) cancelForfeit(d.id, user.id);
+
+  // ---- Both-ready countdown ----
+  //
+  // The new round-start contract: turn_deadline stays null until
+  // BOTH participants are actually in the debate room. The previous
+  // code called startTurn at match-creation time, which meant the
+  // 5-minute clock was already ticking down while the players were
+  // still navigating to the page — they'd join with ~4:55 left.
+  //
+  // Now: the moment the second human joins (or a single human joins
+  // a bot match), we broadcast `match_ready` with a 3-second
+  // countdown, then call startTurn. Showcase debates (bot vs bot)
+  // skip the countdown — they're driven by the bot-scheduler, not a
+  // turn clock.
   if (
     isParticipant &&
     d.status === "live" &&
@@ -184,22 +202,60 @@ async function onJoinDebate(
     !isShowcaseDebate(d) &&
     !d.turn_started_at
   ) {
-    const turnUser = d.current_turn_user_id ?? d.player1_id;
-    if (turnUser) {
-      await startTurn(d.id, turnUser, d.current_round ?? 1);
-      const after = await prisma.debate.findUnique({
-        where: { id: d.id },
-        select: { turn_deadline: true },
+    const present = participantsInRoom(d.id);
+    const p1Ready =
+      Boolean(d.player1?.is_bot) ||
+      (d.player1_id !== null && present.has(d.player1_id));
+    const p2Ready =
+      Boolean(d.player2?.is_bot) ||
+      (d.player2_id !== null && present.has(d.player2_id));
+    if (p1Ready && p2Ready) {
+      const COUNTDOWN_SECONDS = 3;
+      io.to(debateRoom(d.id)).emit("match_ready", {
+        debate_id: d.id,
+        countdown_seconds: COUNTDOWN_SECONDS,
       });
-      if (after?.turn_deadline) {
-        scheduleTurnTimeout(io, d.id, after.turn_deadline);
-      }
+      setTimeout(() => {
+        void (async () => {
+          // CAS-style guard: re-read state in case the debate ended
+          // or someone disconnected during the countdown.
+          const fresh = await prisma.debate.findUnique({
+            where: { id: d.id },
+            select: {
+              status: true,
+              turn_deadline: true,
+              turn_started_at: true,
+              current_turn_user_id: true,
+              current_round: true,
+              player1_id: true,
+            },
+          });
+          if (
+            !fresh ||
+            fresh.status !== "live" ||
+            fresh.turn_deadline ||
+            fresh.turn_started_at
+          ) {
+            return;
+          }
+          const turnUser =
+            fresh.current_turn_user_id ?? fresh.player1_id;
+          if (!turnUser) return;
+          await startTurn(d.id, turnUser, fresh.current_round ?? 1);
+          const after = await prisma.debate.findUnique({
+            where: { id: d.id },
+            select: { turn_deadline: true },
+          });
+          if (after?.turn_deadline) {
+            scheduleTurnTimeout(io, d.id, after.turn_deadline);
+          }
+          await emitTurnChanged(io, d.id, false);
+          // If the first speaker is a bot, schedule its turn now.
+          maybeScheduleHouseTurn(io, d.id, 0.5);
+        })();
+      }, COUNTDOWN_SECONDS * 1000).unref();
     }
   }
-
-  // Track presence + cancel any pending forfeit timer (reconnect win).
-  const count = trackRoomJoin(socket.id, d.id, user.id, !isParticipant);
-  if (isParticipant) cancelForfeit(d.id, user.id);
 
   const existingVote = await getUserVote(d.id, user.id);
   const statePayload: Record<string, unknown> = {

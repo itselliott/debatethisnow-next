@@ -82,7 +82,21 @@ export function useVoiceInput(lang = "en-US") {
     (onResult: (r: SpeechResult) => void) => {
       const Ctor = getRecognitionCtor();
       if (!Ctor) {
-        setError("Voice input isn't supported in this browser.");
+        setError(
+          "Voice input isn't supported in this browser. Try Chrome, Edge, or Safari.",
+        );
+        return;
+      }
+      // Web Speech API requires a secure context (HTTPS or localhost).
+      // Surface that explicitly so users don't burn time wondering why
+      // permissions never prompted.
+      if (
+        typeof window !== "undefined" &&
+        window.isSecureContext === false
+      ) {
+        setError(
+          "Voice input only works over HTTPS. Reload on the secure URL.",
+        );
         return;
       }
       const rec = new Ctor();
@@ -102,7 +116,16 @@ export function useVoiceInput(lang = "en-US") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const err = (ev as any).error as string | undefined;
         if (err === "not-allowed" || err === "service-not-allowed") {
-          setError("Microphone permission denied.");
+          setError(
+            "Microphone permission denied. Click the lock icon in your address bar to allow.",
+          );
+        } else if (err === "audio-capture") {
+          setError("No microphone found.");
+        } else if (err === "network") {
+          setError("Network error reaching the speech service.");
+        } else if (err === "aborted") {
+          // User stopped or a new session started; not an error worth
+          // showing.
         } else if (err === "no-speech") {
           // Silent — common on quiet rooms, not user-actionable.
         } else if (err) {
@@ -118,8 +141,12 @@ export function useVoiceInput(lang = "en-US") {
         recognitionRef.current = rec;
         setListening(true);
         setError(null);
-      } catch {
-        setError("Couldn't start the microphone.");
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? `Couldn't start the microphone: ${err.message}`
+            : "Couldn't start the microphone.",
+        );
       }
     },
     [lang],

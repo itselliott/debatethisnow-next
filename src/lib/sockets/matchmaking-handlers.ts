@@ -16,7 +16,6 @@ import {
   matchmakingMutex,
   queueLength,
 } from "@/lib/services/matchmaking-service";
-import { startTurn } from "@/lib/services/debate-service";
 import { userFromSocket, userFromHandlerPayload } from "@/lib/sockets/auth";
 import {
   sidToUser,
@@ -178,7 +177,13 @@ async function onJoinMatchmaking(
       chosenCategory,
     );
     if (!debate) return; // race lost
-    await startTurn(debate.id, debate.current_turn_user_id ?? user.id, 1);
+    // DELIBERATELY do NOT call startTurn here. The previous behavior
+    // set turn_deadline at match creation, which meant the clock was
+    // already ticking when the two players were still navigating to
+    // the debate page — they'd arrive with 4:55 left on a 5-minute
+    // round. The turn now starts via the both-ready countdown in
+    // `onJoinDebate` once BOTH participants have actually joined the
+    // socket room.
 
     const eventPayload = {
       debate_id: debate.id,

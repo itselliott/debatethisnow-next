@@ -110,6 +110,25 @@ export function spectatorCount(debateId: number): number {
   return spectators.get(debateId)?.size ?? 0;
 }
 
+/**
+ * Set of participant user IDs currently connected to a debate room.
+ * (Participants are tracked in `sidRoom` with isSpectator=false; this
+ * helper iterates that map and returns just the unique user IDs.)
+ *
+ * Used by the join handler to decide whether to start the 3-second
+ * "match starts in…" countdown — we only kick the round once BOTH
+ * humans are actually in the room.
+ */
+export function participantsInRoom(debateId: number): Set<number> {
+  const ids = new Set<number>();
+  for (const entry of sidRoom.values()) {
+    if (entry.debateId === debateId && !entry.isSpectator) {
+      ids.add(entry.userId);
+    }
+  }
+  return ids;
+}
+
 /** Test-only — clears every map. */
 export function _resetSocketState(): void {
   sidRoom.clear();

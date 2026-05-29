@@ -35,6 +35,7 @@ import { VotePanel } from "./components/VotePanel";
 import { ShowcasePanel } from "./components/ShowcasePanel";
 import { EndScreen } from "./components/EndScreen";
 import { PrepBanner } from "./components/PrepBanner";
+import { MatchCountdown } from "./components/MatchCountdown";
 
 interface Props {
   debateId: number;
@@ -203,6 +204,17 @@ export function DebateRoom({
     },
   );
 
+  // Round-start countdown — server fires this the moment both
+  // participants have actually joined the room. The store ticks it
+  // down each second; the CountdownCard hides itself when it reaches
+  // zero.
+  useSocketEvent<{ debate_id: number; countdown_seconds: number }>(
+    "match_ready",
+    (payload) => {
+      store.getState().setMatchCountdown(payload.countdown_seconds);
+    },
+  );
+
   // `voting_open` fires after the closing argument lands. The server
   // also broadcasts `debate_state` so status flips to "voting", but
   // an explicit request_state here guarantees we never display a stale
@@ -279,6 +291,7 @@ export function DebateRoom({
       ) : null}
       {isShowcase ? <ShowcasePanel store={store} viewerId={viewerId} /> : null}
       {showEndScreen ? <EndScreen store={store} /> : null}
+      <MatchCountdown store={store} />
     </div>
   );
 }

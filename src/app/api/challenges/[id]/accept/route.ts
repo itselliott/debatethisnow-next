@@ -12,7 +12,6 @@ import {
   requireUserOr401,
   serverErrorResponse,
 } from "@/lib/api/guard";
-import { startTurn } from "@/lib/services/debate-service";
 import { notify } from "@/lib/services/notification-service";
 import { toChallengeDict } from "@/lib/serializers/challenge";
 import { getSocketIo } from "@/lib/sockets/io-handle";
@@ -74,7 +73,10 @@ export async function POST(
       });
       return d;
     });
-    await startTurn(debate.id, debate.current_turn_user_id ?? c.challenger_id, 1);
+    // No startTurn here — the turn starts via the both-ready countdown
+    // in the socket join handler once both players are actually in the
+    // debate room. Calling startTurn at accept-time meant the timer
+    // started before either player had finished navigating.
 
     const payload = {
       debate_id: debate.id,
