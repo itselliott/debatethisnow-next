@@ -43,16 +43,28 @@ export function isValidAvatar(s: unknown): boolean {
 }
 
 /**
- * Resolve a stored avatar to something safe to render. Empty / null
- * legacy values fall back to a generic glyph keyed by the username
- * (deterministic per user so they get the same default each visit).
+ * Resolve a stored avatar to something safe to render. Anything that
+ * isn't a real catalog glyph (null, empty string, or the Prisma column
+ * default `"default"` that every new user starts with) falls through
+ * to a deterministic per-username glyph — same user, same glyph,
+ * every visit.
+ *
+ * The earlier guard only filtered null and empty, which meant users
+ * with the schema's default avatar value rendered the literal text
+ * "default" wherever their face was supposed to be. Fixed by also
+ * treating non-catalog strings as fallback.
  */
 export function displayAvatar(
   stored: string | null | undefined,
   username: string,
 ): string {
-  if (stored && stored !== "bot" && stored !== "") return stored;
   if (stored === "bot") return "🤖";
+  // Accept only strings that are actual catalog entries. Anything
+  // else (null, "", "default", an old emoji we removed, garbage) gets
+  // the deterministic fallback below.
+  if (typeof stored === "string" && ALL_AVATARS.includes(stored)) {
+    return stored;
+  }
   // Hash the username to pick a default. Same user always gets the
   // same glyph — gives anon users a stable visual identity without
   // any picker step.
