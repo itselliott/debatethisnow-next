@@ -168,13 +168,29 @@
   html {
     background: var(--color-paper);
     color: var(--color-ink);
-    /* Bumping the root font-size from the browser default (16px) up
-     * to 18px scales every rem-based Tailwind utility (padding,
-     * margin, gap, font sizes) by 12.5%. That brings the page in
-     * line with the user-tested zoom level (~115%) so the default
-     * "100%" view already breathes properly without anyone needing
-     * to manually zoom. */
-    font-size: 18px;
+    /* Responsive root font-size — every rem-based Tailwind utility
+     * (padding, margin, gap, font sizes) scales with this anchor.
+     *   mobile  (default): 15px — keeps text-6xl headings fitting in
+     *                       a 390px viewport without overflow
+     *   tablet  (sm 640+): 16px — standard browser default
+     *   desktop (md 768+): 18px — the comfortable read-zoom level
+     *                       desktops were tuned for
+     * Anchoring this at the html level beats per-component breakpoints
+     * because it scales the whole design system at once instead of
+     * forcing every component to add `text-* md:text-*` pairs. */
+    font-size: 15px;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  @media (min-width: 768px) {
+    html {
+      font-size: 18px;
+    }
   }
 
   body {

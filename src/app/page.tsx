@@ -15,21 +15,24 @@ export default async function HomePage() {
     redirect("/dashboard");
   }
   return (
-    <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col items-center gap-12 p-8 pt-16">
+    <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col items-center gap-8 p-4 pt-8 sm:gap-10 sm:p-6 sm:pt-12 md:gap-12 md:p-8 md:pt-16">
       {/* HERO */}
-      <section className="flex flex-col items-center gap-5 text-center">
+      <section className="flex w-full flex-col items-center gap-4 text-center sm:gap-5">
         <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
           Competitive 1v1 Debate
         </span>
-        <h1 className="font-display text-6xl leading-[0.95] md:text-7xl">
+        {/* Hero title — three explicit steps so DEBATETHIS fits a 390px
+         * phone viewport without horizontal overflow (text-7xl at the
+         * 18px desktop root is ~81px which is wider than the screen). */}
+        <h1 className="font-display text-4xl leading-[0.95] sm:text-6xl md:text-7xl">
           DEBATE<span className="text-red">THIS</span>
         </h1>
-        <p className="max-w-xl text-base text-sepia md:text-lg">
+        <p className="max-w-xl text-sm text-sepia sm:text-base md:text-lg">
           An online arena for arguments. Three rounds. One winner. Real Elo.
           Practice against humans or AI bots — no coach, no commitment, free
           to play.
         </p>
-        <div className="mt-2 flex flex-wrap justify-center gap-3">
+        <div className="mt-2 flex w-full flex-wrap justify-center gap-3">
           <Link
             href="/register"
             className="rounded bg-red px-5 py-3 font-condensed text-sm uppercase tracking-widest text-paper shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-press-sm"
