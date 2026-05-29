@@ -43,6 +43,15 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob:",
+  // `media-src 'self' https:` — required for the RadioWidget to play
+  // ANY external audio stream. Without an explicit media-src directive
+  // the browser falls back to default-src ('self'), which blocked
+  // every preset Chicago radio URL with "no supported source was
+  // found" — the audio element couldn't even fetch the stream. We
+  // accept the broader allowlist because the user can paste any HTTPS
+  // stream URL via the custom-station input, and pinning to specific
+  // CDN hostnames would break that escape hatch.
+  "media-src 'self' https: blob:",
   "connect-src 'self' ws: wss: https://cdn.socket.io",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -75,9 +84,18 @@ export function proxy(req: NextRequest) {
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("Referrer-Policy", "same-origin");
+  // Permissions-Policy:
+  //   - `microphone=(self)` — voice input on the debate composer needs
+  //     mic access for SpeechRecognition + getUserMedia. The previous
+  //     value (`microphone=()`) was an empty allowlist that blocked
+  //     mic access entirely, OVERRIDING the user's per-site grant in
+  //     the browser. That was the actual cause of every "permission
+  //     denied" error users saw despite having allowed the mic at the
+  //     browser level.
+  //   - Other features stay blocked since we don't use them.
   res.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
   );
   res.headers.set("Content-Security-Policy", CSP);
   if (shouldNoindex(pathname)) {
