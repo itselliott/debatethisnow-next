@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
 
 export function EndScreen({ store }: { store: DebateStore }) {
   const state = useStore(store, (s) => s.state);
   const result = useStore(store, (s) => s.result);
+  const me = useCurrentUser();
   if (!state || !result) return null;
 
   const winnerName =
@@ -15,6 +17,12 @@ export function EndScreen({ store }: { store: DebateStore }) {
       : result.winner_id === state.player2?.id
         ? state.player2?.username
         : null;
+
+  // Guest users see a save-account CTA instead of the regular
+  // "Return to Arena" — the arena is the lobby for authed users.
+  // Their debate history, ELO, and username are preserved when they
+  // claim via /register?claim=1.
+  const isGuest = me.data?.is_guest === true;
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/70 backdrop-blur-sm p-6">
@@ -44,12 +52,31 @@ export function EndScreen({ store }: { store: DebateStore }) {
             isWinner={result.winner_id === state.player2?.id}
           />
         </div>
+        {isGuest ? (
+          <div className="rounded border-2 border-red bg-paper p-4 text-center shadow-press">
+            <p className="font-display text-base text-ink">
+              Save this {winnerName === me.data?.username ? "win" : "result"}{" "}
+              to a real account.
+            </p>
+            <p className="mt-1 text-xs text-sepia">
+              Keeps your username{" "}
+              <strong className="text-ink">{me.data?.username}</strong>, your
+              Elo, and this debate on your record. Takes about 20 seconds.
+            </p>
+            <Link
+              href="/register?claim=1"
+              className="mt-3 inline-block rounded bg-red px-5 py-2 font-condensed text-sm uppercase tracking-widest text-paper shadow-press-sm hover:opacity-90"
+            >
+              Save my account ▸
+            </Link>
+          </div>
+        ) : null}
         <div className="flex justify-center gap-3">
           <Link
-            href="/dashboard"
+            href={isGuest ? "/play" : "/dashboard"}
             className="rounded border-2 border-ink bg-paper px-4 py-2 font-condensed text-sm uppercase tracking-widest hover:bg-ink hover:text-paper"
           >
-            Return to Arena
+            {isGuest ? "Debate again" : "Return to Arena"}
           </Link>
           <Link
             href={`/results/${state.id}`}

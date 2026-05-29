@@ -46,6 +46,16 @@ export default async function HomePage() {
             Log In
           </Link>
         </div>
+        {/* No-friction option — anon-to-anon challenge, no sign-up
+            required to start. The full account flow above is the
+            preferred path (rankings, history), but this captures
+            users who want to try the product before committing. */}
+        <Link
+          href="/play"
+          className="mt-1 font-condensed text-xs uppercase tracking-widest text-red hover:underline"
+        >
+          Or challenge a friend without signing up ▸
+        </Link>
       </section>
 
       {/* FEATURE ROW */}

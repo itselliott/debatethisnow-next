@@ -8,20 +8,34 @@ export const metadata = {
 };
 
 export default async function RegisterPage() {
-  if (await getCurrentUser()) {
+  const user = await getCurrentUser();
+  // Real (claimed) accounts bounce to the dashboard. Guests stay —
+  // they're here to CLAIM their guest session into a full account
+  // via the /api/auth/claim-guest path the form picks up below.
+  if (user && !user.is_guest) {
     redirect("/dashboard");
   }
+  const isClaiming = user?.is_guest === true;
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6 rounded-md border border-ink bg-paper-2 p-8 shadow-press">
         <div className="space-y-1 border-b-2 border-ink/30 pb-4">
           <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-            Enlist
+            {isClaiming ? "Save your guest account" : "Enlist"}
           </span>
-          <h1 className="font-display text-3xl text-ink">Create Account</h1>
-          <p className="text-sm text-sepia">Pick a callsign. Earn your rank.</p>
+          <h1 className="font-display text-3xl text-ink">
+            {isClaiming ? "Claim your account" : "Create Account"}
+          </h1>
+          <p className="text-sm text-sepia">
+            {isClaiming
+              ? `Keep your username, Elo, and debate history. You're currently signed in as ${user.username}.`
+              : "Pick a callsign. Earn your rank."}
+          </p>
         </div>
-        <RegisterForm />
+        <RegisterForm
+          claiming={isClaiming}
+          presetUsername={isClaiming ? user.username : null}
+        />
         <div className="flex items-center justify-center gap-1.5 text-xs text-sepia">
           <span aria-hidden>🔒</span>
           <span>Encrypted in transit. We never store your password in plaintext.</span>

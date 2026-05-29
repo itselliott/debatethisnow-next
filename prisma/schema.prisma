@@ -55,6 +55,14 @@ model User {
   is_admin              Boolean   @default(false)
   is_banned             Boolean   @default(false)
   is_bot                Boolean   @default(false)
+  // Anonymous "guest" accounts created on the fly so two strangers
+  // can debate without signing up. Carries a placeholder email +
+  // password_hash; the user converts to a full account via the
+  // /api/auth/claim-guest flow shown on the EndScreen modal. Manual
+  // SQL to apply (Neon pooled URL can't run prisma migrate deploy):
+  //   ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_guest"
+  //     BOOLEAN NOT NULL DEFAULT FALSE;
+  is_guest              Boolean   @default(false)
   owner_id              Int?
   api_key               String?   @unique @db.VarChar(64)
   bot_description       String?   @db.VarChar(280)
@@ -335,7 +343,12 @@ model Report {
 model Challenge {
   id              Int       @id @default(autoincrement())
   challenger_id   Int
-  target_id       Int
+  // Nullable when the challenger created an "open" anon-to-anon
+  // invite — the first guest visitor to /c/<id> takes the slot. For
+  // traditional user-to-user challenges this is set at creation
+  // time as before. Manual SQL to apply:
+  //   ALTER TABLE "challenges" ALTER COLUMN "target_id" DROP NOT NULL;
+  target_id       Int?
   topic           String    @db.VarChar(255)
   category        String?   @default("Society") @db.VarChar(64)
   note            String?   @db.Text
@@ -346,7 +359,7 @@ model Challenge {
   accepted_at     DateTime?
 
   challenger      User      @relation("Challenger", fields: [challenger_id], references: [id], onDelete: Cascade)
-  target          User      @relation("ChallengeTarget", fields: [target_id], references: [id], onDelete: Cascade)
+  target          User?     @relation("ChallengeTarget", fields: [target_id], references: [id], onDelete: Cascade)
   debate          Debate?   @relation(fields: [debate_id], references: [id], onDelete: SetNull)
 
   @@index([challenger_id])

@@ -29,6 +29,10 @@ export interface PrivateUserDict extends PublicUserDict {
   created_at: string | null;
   last_seen_at: string | null;
   is_admin: boolean;
+  // Surfaced so the client can show the "Save your account" CTA in
+  // the EndScreen modal and the sidebar when a guest user finishes a
+  // debate. Real (claimed) accounts always return false.
+  is_guest: boolean;
 }
 
 export interface AdminUserDict extends PrivateUserDict {
@@ -61,6 +65,7 @@ export function toPrivateDict(user: User): PrivateUserDict {
     created_at: user.created_at ? user.created_at.toISOString() : null,
     last_seen_at: user.last_seen_at ? user.last_seen_at.toISOString() : null,
     is_admin: Boolean(user.is_admin),
+    is_guest: Boolean(user.is_guest),
   };
 }
 

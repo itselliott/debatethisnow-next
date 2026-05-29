@@ -18,6 +18,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/server";
 import { toChallengeDict } from "@/lib/serializers/challenge";
 import { AcceptDeclineButtons } from "./AcceptDeclineButtons";
+import { AnonAcceptForm } from "./AnonAcceptForm";
 
 export const metadata = {
   title: "Debate Challenge · DebateThis",
@@ -39,8 +40,11 @@ export default async function ChallengeLandingPage({
   const c = toChallengeDict(row);
   const viewer = await getCurrentUser();
 
+  // Open invite — challenger left target_id null, meaning the first
+  // anon visitor takes the slot. Created via /play.
+  const isOpen = row.target_id === null;
   const isIntendedTarget =
-    viewer !== null && row.target_id === viewer.id;
+    !isOpen && viewer !== null && row.target_id === viewer.id;
   const isChallenger =
     viewer !== null && row.challenger_id === viewer.id;
   const expired = c.expires_at && new Date(c.expires_at) < new Date();
@@ -54,7 +58,7 @@ export default async function ChallengeLandingPage({
         </span>
         <h1 className="mt-1 font-display text-3xl">
           {c.challenger?.username ?? "Someone"} vs{" "}
-          {c.target?.username ?? "you"}
+          {isOpen ? "you" : c.target?.username ?? "you"}
         </h1>
       </header>
 
@@ -90,11 +94,19 @@ export default async function ChallengeLandingPage({
         </section>
       ) : null}
 
-      {resolvedStatus === "pending" && !expired && isIntendedTarget ? (
+      {/* OPEN invite (no specific target). Anyone — anon or authed
+          but-not-the-challenger — can take the slot. The challenger
+          themselves obviously can't accept their own invite, so we
+          gate them out. */}
+      {resolvedStatus === "pending" && !expired && isOpen && !isChallenger ? (
+        <AnonAcceptForm challengeId={c.id} />
+      ) : null}
+
+      {resolvedStatus === "pending" && !expired && !isOpen && isIntendedTarget ? (
         <AcceptDeclineButtons challengeId={c.id} />
       ) : null}
 
-      {resolvedStatus === "pending" && !expired && !viewer ? (
+      {resolvedStatus === "pending" && !expired && !isOpen && !viewer ? (
         <section className="rounded border-2 border-red bg-paper-2 p-4 text-center shadow-press">
           <p className="font-display text-base text-ink">
             Sign up free to accept this challenge.
@@ -123,7 +135,7 @@ export default async function ChallengeLandingPage({
         </section>
       ) : null}
 
-      {resolvedStatus === "pending" && !expired && viewer && !isIntendedTarget && !isChallenger ? (
+      {resolvedStatus === "pending" && !expired && !isOpen && viewer && !isIntendedTarget && !isChallenger ? (
         <section className="rounded border border-ink bg-paper-2 p-4 text-center shadow-press">
           <p className="text-sm text-sepia">
             This challenge is between{" "}
@@ -136,8 +148,9 @@ export default async function ChallengeLandingPage({
 
       {isChallenger ? (
         <section className="rounded border border-ink bg-paper-2 p-4 text-sm text-sepia shadow-press-sm">
-          You sent this challenge. {c.target?.username ?? "Your opponent"} has
-          24 hours to accept.
+          {isOpen
+            ? `Waiting for someone to accept. Anyone with this link can take the other side — you'll be auto-redirected when they do.`
+            : `You sent this challenge. ${c.target?.username ?? "Your opponent"} has 24 hours to accept.`}
         </section>
       ) : null}
     </div>

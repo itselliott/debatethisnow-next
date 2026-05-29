@@ -9,7 +9,26 @@ interface RegisterResponse {
   message?: string;
 }
 
-export function RegisterForm() {
+/**
+ * Register/claim form. Two modes:
+ *
+ *   - Normal:  blank form, POST /api/auth/register, creates a fresh
+ *              account, redirects to /dashboard.
+ *
+ *   - Claim:   the user is already signed in as a guest (e.g. anon-
+ *              to-anon debate just finished, EndScreen sent them
+ *              here). Username is pre-filled but editable; POST goes
+ *              to /api/auth/claim-guest which upgrades the existing
+ *              guest user row in place — same user_id, so the debate
+ *              they just finished stays on their record.
+ */
+export function RegisterForm({
+  claiming = false,
+  presetUsername = null,
+}: {
+  claiming?: boolean;
+  presetUsername?: string | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -25,14 +44,27 @@ export function RegisterForm() {
         const password = String(formData.get("password") ?? "");
         startTransition(async () => {
           try {
-            const res = await fetch("/api/auth/register", {
+            // Endpoint + body shape diverge between modes — claim
+            // omits username when it matches the existing one, so the
+            // server doesn't have to re-validate uniqueness.
+            const endpoint = claiming
+              ? "/api/auth/claim-guest"
+              : "/api/auth/register";
+            const body = claiming
+              ? {
+                  email,
+                  password,
+                  ...(username !== presetUsername ? { username } : {}),
+                }
+              : { username, email, password };
+            const res = await fetch(endpoint, {
               method: "POST",
               credentials: "same-origin",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username, email, password }),
+              body: JSON.stringify(body),
             });
             const data = (await res.json().catch(() => ({}))) as RegisterResponse;
-            if (!res.ok || !data.user) {
+            if (!res.ok || (!claiming && !data.user)) {
               setError(data.message ?? data.error ?? "Registration failed");
               return;
             }
@@ -57,6 +89,7 @@ export function RegisterForm() {
           name="username"
           type="text"
           required
+          defaultValue={presetUsername ?? undefined}
           autoComplete="username"
           minLength={3}
           maxLength={32}
@@ -64,6 +97,12 @@ export function RegisterForm() {
           title="3-32 letters, numbers, underscore, or hyphen"
           className="w-full rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm focus:outline-none focus:ring-2 focus:ring-red"
         />
+        {claiming ? (
+          <p className="text-xs text-sepia">
+            Keep this to preserve your debate history, or edit if you prefer
+            a different handle.
+          </p>
+        ) : null}
       </div>
       <div className="space-y-1">
         <label
@@ -94,7 +133,7 @@ export function RegisterForm() {
           type="password"
           required
           autoComplete="new-password"
-          minLength={6}
+          minLength={8}
           className="w-full rounded border-2 border-ink bg-paper px-3 py-2 font-body shadow-press-sm focus:outline-none focus:ring-2 focus:ring-red"
         />
       </div>
@@ -111,7 +150,13 @@ export function RegisterForm() {
         disabled={pending}
         className="w-full rounded bg-red px-4 py-3 font-condensed text-base uppercase tracking-widest text-paper shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-press-sm disabled:opacity-50"
       >
-        {pending ? "Creating…" : "Create Account"}
+        {pending
+          ? claiming
+            ? "Saving…"
+            : "Creating…"
+          : claiming
+            ? "Save my account"
+            : "Create Account"}
       </button>
     </form>
   );
