@@ -10,6 +10,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { rankTierForElo, winRate } from "@/lib/services/rank-service";
+import { tierColor } from "@/lib/tiers";
 import { DashboardClient } from "./DashboardClient";
 
 export const metadata = { title: "Dashboard · DebateThis" };
@@ -17,6 +18,7 @@ export const metadata = { title: "Dashboard · DebateThis" };
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const tier = rankTierForElo(user.elo_rating);
   return (
     <div className="space-y-8">
       <header className="space-y-2 border-b-[3px] border-double border-ink pb-4">
@@ -33,7 +35,7 @@ export default async function DashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Elo" value={user.elo_rating} />
-        <Stat label="Tier" value={rankTierForElo(user.elo_rating)} />
+        <Stat label="Tier" value={tier} valueColor={tierColor(tier)} />
         <Stat label="Wins" value={user.wins} />
         <Stat
           label="Win Rate"
@@ -46,13 +48,28 @@ export default async function DashboardPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string | number;
+  // Optional override — used by the Tier stat so "Silver" displays in
+  // silver, "Gold" in gold, etc. (matches the sidebar tier chip).
+  valueColor?: string;
+}) {
   return (
     <div className="rounded border border-ink bg-paper-2 p-4 shadow-press-sm">
       <div className="font-condensed text-xs uppercase tracking-wider text-sepia">
         {label}
       </div>
-      <div className="mt-1 font-display text-2xl text-ink">{value}</div>
+      <div
+        className="mt-1 font-display text-2xl text-ink"
+        style={valueColor ? { color: valueColor } : undefined}
+      >
+        {value}
+      </div>
     </div>
   );
 }

@@ -34,7 +34,7 @@ export function ThemeToggleButton({
       title={aria}
       className={`relative inline-flex items-center justify-center gap-1 rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft ${className}`}
     >
-      <span aria-hidden className="text-base leading-none">
+      <span aria-hidden className="text-lg leading-none">
         {isDark ? "☀" : "☾"}
       </span>
       {label ? (

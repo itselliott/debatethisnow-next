@@ -244,7 +244,16 @@ function SoundToggleButton({ compact = false }: { compact?: boolean }) {
       title={muted ? "Sound off" : "Sound on"}
       className="inline-flex items-center justify-center gap-1 rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
     >
-      <span aria-hidden>{muted ? "♪̸" : "♪"}</span>
+      {/* Eighth-note glyph at text-lg so the icon reads as a music
+       * note at compact sizes. Muted state: dim + line-through instead
+       * of the combining-solidus character which renders inconsistently
+       * across fonts. */}
+      <span
+        aria-hidden
+        className={`text-lg leading-none ${muted ? "line-through opacity-60" : ""}`}
+      >
+        ♪
+      </span>
       {!compact ? (
         <span>{muted ? t("sidebar_sound_off") : t("sidebar_sound_on")}</span>
       ) : null}
@@ -281,7 +290,9 @@ function LogoutButton({ compact = false }: { compact?: boolean }) {
       title={t("sidebar_log_out")}
       className="inline-flex items-center justify-center gap-1 rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-red hover:text-paper"
     >
-      <span aria-hidden>⏻</span>
+      <span aria-hidden className="text-lg leading-none">
+        ⏻
+      </span>
       {!compact ? <span>{t("sidebar_log_out")}</span> : null}
     </button>
   );

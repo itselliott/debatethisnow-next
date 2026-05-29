@@ -1,45 +1,60 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — WPA poster palette + letterpress shadows from the
- * existing main.css. Source of truth: MIGRATION_UI_INVENTORY.md §
- * "CSS — main.css".
+ * Design tokens — WPA poster palette + letterpress shadows.
+ *
+ * Light palette (user-provided):
+ *   #FFFDEB cream off-white — main body bg
+ *   #E8DBB3 tan — secondary surface, dividers
+ *   #7DAACB sky blue — accent / info
+ *   #CE2626 red — action / CTA
+ *   Paired with deep navy #1A2842 for ink/text.
  *
  * Tailwind 4 reads these via `@theme inline`, exposing them as
  * `bg-paper`, `text-ink`, `font-display` utilities.
+ *
+ * Token philosophy:
+ *   - `paper`, `ink`, `navy`, `red`, `gold` are STABLE — they never
+ *     change between themes. This matters because `text-paper` is used
+ *     as "light text on dark surface" (sidebar, mobile nav, red
+ *     buttons) and would be unreadable if it swapped to a dark value
+ *     in dark mode. Same for `bg-ink/70` (modal scrim) — it must
+ *     remain a dark overlay regardless of theme.
+ *   - Dark mode flips the SURFACE utilities (`.bg-paper-*`, `.text-ink`,
+ *     `.text-sepia`, `.border-ink`) via explicit overrides in the
+ *     `:root[data-theme="dark"]` block below. This way the same token
+ *     can mean "light text" (text-paper) and "dark surface" (bg-ink)
+ *     simultaneously without conflict.
  */
 
 @theme inline {
-  /* Paper / ink — clean off-white parchment. Earlier values
-   * (#f1e6c8 etc.) were a saturated WPA-poster yellow that read
-   * "vintage" but also "tinted". This palette keeps the slight
-   * warmth + paper feel without the over-saturation, making it
-   * easier on the eyes for long debate sessions. */
-  --color-paper: #faf7f0;
-  --color-paper-2: #fdfbf5;
-  --color-paper-3: #ede5d3;
-  --color-paper-4: #d8ccb4;
-  --color-ink: #182846;
-  --color-ink-soft: #2a3f63;
-  --color-sepia: #6b5a36;
-  --color-muted-ink: #8a7649;
+  /* Paper / ink — cream parchment + deep navy text. */
+  --color-paper: #FFFDEB;
+  --color-paper-2: #FFFAE0;
+  --color-paper-3: #E8DBB3;
+  --color-paper-4: #C9B888;
+  --color-ink: #1A2842;
+  --color-ink-soft: #2C3F5E;
+  --color-sepia: #6B5A36;
+  --color-muted-ink: #8A7649;
 
-  /* Action colors */
-  --color-red: #c4282e;
-  --color-red-dark: #9a1e23;
-  --color-gold: #d4a017;
-  --color-gold-dark: #a87f10;
-  --color-navy: #182846;
-  --color-green-action: #4a7c3a;
+  /* Action colors — red and gold are brand-stable across themes. */
+  --color-red: #CE2626;
+  --color-red-dark: #A01818;
+  --color-gold: #D4A017;
+  --color-gold-dark: #A87F10;
+  --color-navy: #1A2842;
+  --color-green-action: #4A7C3A;
+  /* Sky-blue accent — for info/highlight chips. */
+  --color-blue-accent: #7DAACB;
 
-  /* Letterpress-shadow color. Decoupled from `--color-ink` because
-   * in dark mode the text becomes light but the shadow needs to stay
-   * dark for contrast. */
-  --color-shadow: #182846;
+  /* Letterpress-shadow color. Swaps to near-black in dark mode so
+   * shadows stay readable against dark cards. */
+  --color-shadow: #1A2842;
   /* Halftone-dot overlay color + blend mode for the body::before
    * texture. Inverted in dark mode so the dotted noise stays visible
    * against the darker background. */
-  --halftone-color: rgba(24, 40, 70, 0.035);
+  --halftone-color: rgba(26, 40, 66, 0.035);
   --halftone-blend: multiply;
 
   /* Semantic aliases used in main.css */
@@ -54,50 +69,97 @@
 }
 
 /*
- * Base styles + halftone-overlay decoration. Mirrors the body::before
- * trick from main.css that adds the aged-paper texture site-wide.
- */
-/*
  * Dark theme — activated by setting `data-theme="dark"` on the <html>
- * element (via `useTheme` hook). All values override the @theme
- * defaults; Tailwind utilities re-resolve their computed colors
- * automatically because they reference these CSS variables.
+ * element (via `useTheme` hook).
  *
- * Palette philosophy: warm dark instead of cold-blue dark — the
- * paper-equivalent goes to a deep brown-black so the light/dark
- * versions feel like the same product viewed in different lighting,
- * not two unrelated themes.
+ * Approach: override Tailwind utility CLASSES directly (not the
+ * `--color-paper` etc. tokens) so the same token can serve as "light
+ * text" via `text-paper` AND "dark body surface" via `bg-paper`. If we
+ * swapped the variable, both would flip together — which is what broke
+ * the sidebar (text-paper went dark on a still-dark bg-navy) and the
+ * end-of-debate modal (bg-ink/70 backdrop went CREAM, washing out the
+ * whole modal).
+ *
+ * WCAG-tuned dark palette (research-backed):
+ *   bg-body     #0E1828  warm midnight
+ *   bg-card     #1A2438  raised surface  (≈14.9:1 vs cream text)
+ *   bg-raised   #212B40  hover/elevated
+ *   bg-modal    #2A3449  modal/menu
+ *   text-prim   #F2EBD7  warm cream  (14.9:1 on body)
+ *   text-muted  #C9BFA3  (~9:1)
+ *   border      #3A4258  (3.1:1 — WCAG non-text min)
+ *   red-accent  #E85A4F  (5.8:1 — brand red, lifted)
+ *   blue-accent #9CC4DF  (8.1:1 — sky blue, lifted)
+ *   gold-accent #E8B833  (brand gold, lifted)
  */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  /* Paper inverts to dark warm brown-black */
-  --color-paper: #1a1814;
-  --color-paper-2: #221f1a;
-  --color-paper-3: #2d2920;
-  --color-paper-4: #3a3528;
-  /* Text inverts to warm cream */
-  --color-ink: #f0ead8;
-  --color-ink-soft: #d8d2bd;
-  --color-sepia: #b8a880;
-  --color-muted-ink: #9a8c66;
-  /* Accents stay vivid but a touch brighter to compensate for dark
-   * surrounding. Brand identity preserved. */
-  --color-red: #e85a60;
-  --color-red-dark: #c4282e;
-  --color-gold: #e8b833;
-  --color-gold-dark: #c49918;
-  /* Sidebar navy → even darker than paper so it still differentiates */
-  --color-navy: #0e1525;
-  --color-green-action: #5fa84a;
-  /* Shadows stay near-black for proper contrast against dark paper */
+  /* Shadows stay near-black for proper contrast against dark cards. */
   --color-shadow: #000;
-  /* Halftone inverted — light dots on dark instead of dark on light.
-   * Blend mode flips to `screen` so the dots add light rather than
-   * subtract it. */
-  --halftone-color: rgba(240, 234, 216, 0.04);
+  /* Halftone inverted — light dots × screen instead of dark dots × multiply. */
+  --halftone-color: rgba(242, 235, 215, 0.04);
   --halftone-blend: screen;
 }
 
+/* Body bg + text — direct override since these don't go through a
+ * utility class. */
+:root[data-theme="dark"] html,
+:root[data-theme="dark"] body {
+  background: #0E1828;
+  color: #F2EBD7;
+}
+
+/* Card / section / overlay backgrounds — invert to dark with
+ * Material-style elevation (cards LIGHTER than body). */
+:root[data-theme="dark"] .bg-paper { background-color: #0E1828; }
+:root[data-theme="dark"] .bg-paper-2 { background-color: #1A2438; }
+:root[data-theme="dark"] .bg-paper-3 { background-color: #212B40; }
+:root[data-theme="dark"] .bg-paper-4 { background-color: #2A3449; }
+
+/* Body / heading text — invert to cream. text-ink is used as "dark
+ * text on light surface" everywhere; flips cleanly to "cream on dark
+ * surface" in dark mode without any other side effects. */
+:root[data-theme="dark"] .text-ink { color: #F2EBD7; }
+:root[data-theme="dark"] .text-ink-soft { color: #C8BFA5; }
+:root[data-theme="dark"] .text-sepia { color: #B8A98A; }
+:root[data-theme="dark"] .text-muted-ink { color: #9D9075; }
+
+/* Borders — lift to a mid-tone navy so they're visible against the
+ * dark body. WCAG 1.4.11 min for non-text is 3:1; #3A4258 hits ~3.1:1. */
+:root[data-theme="dark"] .border-ink { border-color: #3A4258; }
+:root[data-theme="dark"] .border-ink-soft { border-color: #2F4470; }
+:root[data-theme="dark"] .border-t-ink,
+:root[data-theme="dark"] .border-b-ink,
+:root[data-theme="dark"] .border-l-ink,
+:root[data-theme="dark"] .border-r-ink { border-color: #3A4258; }
+
+/* Border with opacity — used in result page, etc. */
+:root[data-theme="dark"] [class*="border-ink\/"] { border-color: rgba(58, 66, 88, 0.6); }
+
+/* Modal scrim — bg-ink/N becomes BLACK in dark mode (was inverting to
+ * a cream overlay because --color-ink was getting swapped — root cause
+ * of the end-screen modal wash-out). */
+:root[data-theme="dark"] .bg-ink\/70 { background-color: rgba(0, 0, 0, 0.7); }
+:root[data-theme="dark"] .bg-ink\/60 { background-color: rgba(0, 0, 0, 0.6); }
+:root[data-theme="dark"] .bg-ink\/50 { background-color: rgba(0, 0, 0, 0.5); }
+:root[data-theme="dark"] .bg-ink\/40 { background-color: rgba(0, 0, 0, 0.4); }
+:root[data-theme="dark"] .bg-ink\/30 { background-color: rgba(0, 0, 0, 0.3); }
+
+/* Brighten action colors for dark — the WCAG-derived lifts. */
+:root[data-theme="dark"] .text-red { color: #E85A4F; }
+:root[data-theme="dark"] .text-red-dark { color: #C4282E; }
+:root[data-theme="dark"] .text-gold { color: #E8B833; }
+:root[data-theme="dark"] .text-gold-dark { color: #C49918; }
+:root[data-theme="dark"] .text-green-action { color: #6FBC5A; }
+
+/* Background versions: bg-red and bg-gold stay brand-stable so buttons
+ * look identical across themes. The `text-paper` on them remains cream
+ * (stable). */
+
+/*
+ * Base styles + halftone-overlay decoration. Mirrors the body::before
+ * trick from main.css that adds the aged-paper texture site-wide.
+ */
 @layer base {
   :root {
     color-scheme: light;
@@ -289,4 +351,14 @@
 .prose-blog a.btn:active {
   transform: translate(3px, 3px);
   box-shadow: none;
+}
+
+/* Dark-mode CTA box — match the inverted card surface. */
+:root[data-theme="dark"] .cta-inline {
+  background: #1A2438;
+  border-color: #3A4258;
+  box-shadow: 4px 4px 0 #000;
+}
+:root[data-theme="dark"] .cta-inline p {
+  color: #F2EBD7;
 }
