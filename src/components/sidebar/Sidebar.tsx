@@ -93,7 +93,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
         >
           DEBATE
           <br />
-          THIS
+          <span className="text-red">THIS</span>
         </Link>
         <button
           type="button"
