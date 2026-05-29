@@ -12,21 +12,82 @@ const PHASE_LABELS: Record<string, string> = {
   closing: "Closing",
 };
 
+/**
+ * Active typewriter state, decoupled from the store's `streaming`
+ * field. The store clears `streaming` the instant `argument_streaming_done`
+ * fires, which previously yanked the typing bubble before the
+ * animation could finish — the user saw a few words type out, then
+ * the entire message slammed in via the persisted MessageBubble. We
+ * hold this locally instead and keep the bubble alive until the
+ * typewriter catches up, even if the canonical message has already
+ * been persisted.
+ */
+interface ActiveTypewriter {
+  author: string;
+  authorId: number;
+  /** Latest target text — grows as stream chunks arrive, then gets
+   * locked to the canonical `argument_posted` content when it lands. */
+  target: string;
+  /** True once `argument_posted` has landed and `target` is canonical. */
+  finalized: boolean;
+}
+
 export function MessagesList({ store }: { store: DebateStore }) {
   const messages = useStore(store, (s) => s.messages);
   const streaming = useStore(store, (s) => s.streaming);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const userScrolledAwayRef = useRef(false);
 
+  const [typing, setTyping] = useState<ActiveTypewriter | null>(null);
+
+  // Sync from the store's streaming chunks. Each new chunk just
+  // updates `target` — we don't reset displayed length, so the
+  // existing typewriter keeps moving forward.
+  useEffect(() => {
+    if (!streaming) return;
+    setTyping((prev) => {
+      if (prev && prev.authorId === streaming.authorId) {
+        return { ...prev, target: streaming.content };
+      }
+      return {
+        author: streaming.authorUsername,
+        authorId: streaming.authorId,
+        target: streaming.content,
+        finalized: false,
+      };
+    });
+  }, [streaming]);
+
+  // When the persisted message for the streaming author lands, lock
+  // its content as the canonical target. This is the AUTHORITATIVE
+  // final value — Groq sometimes finishes streaming before the last
+  // chunk reaches us, so the persisted message is the only thing we
+  // can trust for "what should be typed all the way to".
+  const lastMsg = messages[messages.length - 1];
+  useEffect(() => {
+    if (!typing || typing.finalized || !lastMsg) return;
+    if (lastMsg.author_username === typing.author) {
+      setTyping({ ...typing, target: lastMsg.content, finalized: true });
+    }
+  }, [lastMsg?.id, typing]);
+
+  // Hide the persisted last message while the typewriter is still
+  // walking it out — otherwise the user sees BOTH the still-typing
+  // bubble AND the finished message below it.
+  const renderMessages =
+    typing?.finalized && lastMsg && lastMsg.author_username === typing.author
+      ? messages.slice(0, -1)
+      : messages;
+
   // Smart auto-scroll — same 60px-from-bottom rule as static/js/debate.js.
-  // Also re-runs when streaming content grows so the user follows the
-  // bot's argument as it appears.
+  // Re-runs as the typewriter advances so the user follows the
+  // typing in real time.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     if (userScrolledAwayRef.current) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages.length, streaming?.content.length]);
+  }, [messages.length, typing?.target.length]);
 
   return (
     <section
@@ -39,17 +100,19 @@ export function MessagesList({ store }: { store: DebateStore }) {
       }}
       className="max-h-[60vh] space-y-3 overflow-y-auto rounded border border-ink bg-paper-2 p-4 shadow-press-sm"
     >
-      {messages.length === 0 && !streaming ? (
+      {renderMessages.length === 0 && !typing ? (
         <p className="text-sm text-sepia">
           No arguments yet. The first speaker is preparing.
         </p>
       ) : (
         <>
-          {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
-          {streaming ? (
-            <StreamingBubble
-              author={streaming.authorUsername}
-              content={streaming.content}
+          {renderMessages.map((m) => <MessageBubble key={m.id} message={m} />)}
+          {typing ? (
+            <TypewriterBubble
+              author={typing.author}
+              target={typing.target}
+              finalized={typing.finalized}
+              onComplete={() => setTyping(null)}
             />
           ) : null}
         </>
@@ -58,64 +121,99 @@ export function MessagesList({ store }: { store: DebateStore }) {
   );
 }
 
-// Live "bot is typing" bubble. Renders alongside messages with a
-// pulsing cursor at the end so it reads as in-progress, not finished.
-// When `argument_streaming_done` fires + the real `argument_posted`
-// arrives, the store clears this and the bubble is replaced by a
-// MessageBubble for the persisted message.
-function StreamingBubble({
+/**
+ * Bot "is typing" bubble. Walks `displayed` toward `target` at a
+ * naturalistic pace, with two important behaviours the previous
+ * version was missing:
+ *
+ *   1. Adaptive catchup. If `target` is more than ~80 chars ahead of
+ *      `displayed`, reveal larger chunks per tick. Without this, a
+ *      500-char bot response at the old 12-chars/sec pace took ~40
+ *      seconds to type — viewers got 2 seconds of typing then a
+ *      40-second wait while the bubble disappeared and the full
+ *      message slammed in via the persisted MessageBubble. New pace
+ *      gets through a 500-char response in ~6–8 seconds while still
+ *      reading as deliberate per-word typing.
+ *
+ *   2. Persistence past stream-done. The store clears the streaming
+ *      record on `argument_streaming_done` (often within 1–2 seconds
+ *      of stream start, well before the human-pace reveal could
+ *      finish). The parent now holds typing state independently and
+ *      passes `finalized: true` when the canonical message has
+ *      landed. The bubble keeps animating; `onComplete` fires the
+ *      moment displayed catches target. Only then does the parent
+ *      reveal the persisted MessageBubble.
+ */
+function TypewriterBubble({
   author,
-  content,
+  target,
+  finalized,
+  onComplete,
 }: {
   author: string;
-  content: string;
+  target: string;
+  finalized: boolean;
+  onComplete: () => void;
 }) {
-  // Client-side reveal at a natural human pace. Groq emits tokens at
-  // ~50/sec which arrives so quickly the bubble looked like an instant
-  // paste, not like a person typing. We keep a `displayed` substring
-  // that walks toward the server's full `content` at ~12 chars/sec
-  // (~140 wpm — fast confident typist), with natural variation:
-  //
-  //   - 1–3 chars per tick, randomised
-  //   - 35–75ms between non-punctuation ticks
-  //   - 180–280ms pause at punctuation (. ! ? ; , :)
-  //   - 90–140ms pause at word boundaries
-  //
-  // The pace looks alive without being slow — feels human, doesn't
-  // bore the viewer. When `content` resets (new bot turn), we restart
-  // from 0; when streaming finishes, the bubble is replaced by the
-  // persisted `argument_posted` message via the store, so any
-  // not-yet-revealed tail jumps to its final form there.
   const [displayed, setDisplayed] = useState("");
 
-  // Reset when content shrinks (new turn / new stream).
+  // Reset if target shrinks (new turn / fresh stream).
   useEffect(() => {
-    if (content.length < displayed.length) setDisplayed("");
-  }, [content, displayed.length]);
+    if (target.length < displayed.length) setDisplayed("");
+  }, [target, displayed.length]);
 
-  // Advance one tick at a time. Re-runs whenever displayed/content
-  // changes; clears its timeout on unmount or re-run.
   useEffect(() => {
-    if (displayed.length >= content.length) return;
-    const nextCharIdx = displayed.length;
-    const nextChar = content[nextCharIdx] ?? "";
+    // Done — fire completion. Guard against firing for an empty
+    // target (initial mount before any chunks have arrived).
+    if (displayed.length >= target.length) {
+      if (target.length > 0 && finalized) onComplete();
+      return;
+    }
+    const i = displayed.length;
+    const nextChar = target[i] ?? "";
     const isPunct = /[.!?;,:]/.test(nextChar);
     const isWordBreak = nextChar === " " || nextChar === "\n";
-    const delay = isPunct
-      ? 180 + Math.random() * 100
-      : isWordBreak
-        ? 90 + Math.random() * 50
-        : 35 + Math.random() * 40;
-    const chunkSize = isPunct ? 1 : Math.floor(1 + Math.random() * 3);
-    const timer = window.setTimeout(() => {
-      setDisplayed(content.slice(0, nextCharIdx + chunkSize));
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [displayed, content]);
 
-  const empty = content.length === 0;
-  // Cap to displayed so the user only ever sees what's been "typed".
-  const visible = displayed.length === 0 ? "" : content.slice(0, displayed.length);
+    // Base pace — faster than the original 12 chars/sec. ~30 chars/sec
+    // baseline reads as a confident typist (~360 wpm at 5 chars/word
+    // — fast but not impossibly so).
+    let baseDelay = isPunct
+      ? 110 + Math.random() * 60
+      : isWordBreak
+        ? 50 + Math.random() * 30
+        : 22 + Math.random() * 18;
+    let chunkSize = 1;
+
+    // Adaptive catchup. The further behind we are, the bigger chunks
+    // we eat per tick. The thresholds smoothly trade typing-feel for
+    // catchup-speed: lag <30 = pure human pace; 30–100 = small chunks;
+    // >100 = aggressive multi-char reveal so even 800-char closing
+    // arguments finish in a reasonable window.
+    const lag = target.length - i;
+    if (lag > 100) {
+      baseDelay = 12;
+      chunkSize = Math.min(6, Math.ceil(lag / 80));
+    } else if (lag > 30) {
+      baseDelay = isPunct ? 70 : isWordBreak ? 35 : 16;
+      chunkSize = 2;
+    }
+
+    // Once the message is finalized AND we're still significantly
+    // behind, race to the end faster — the user's already waited
+    // through the stream, no value in stretching the reveal.
+    if (finalized && lag > 40) {
+      baseDelay = Math.max(8, baseDelay - 8);
+      chunkSize = Math.max(chunkSize, 3);
+    }
+
+    const timer = window.setTimeout(() => {
+      setDisplayed(target.slice(0, i + chunkSize));
+    }, baseDelay);
+    return () => window.clearTimeout(timer);
+  }, [displayed, target, finalized, onComplete]);
+
+  const empty = target.length === 0;
+  const visible = displayed.length === 0 ? "" : target.slice(0, displayed.length);
 
   return (
     <article className="rounded border border-red bg-paper p-3 shadow-press-sm">
@@ -129,8 +227,6 @@ function StreamingBubble({
         </span>
       </header>
       {empty ? (
-        // No tokens yet — render three pulsing dots so the user sees
-        // immediate feedback that the bot's request is in flight.
         <p className="mt-2 flex gap-1 text-sm text-sepia">
           <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-sepia [animation-delay:-0.2s]" />
           <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-sepia [animation-delay:-0.1s]" />
