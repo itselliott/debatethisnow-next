@@ -66,7 +66,13 @@ export function useVoiceInput(lang = "en-US") {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [supported, setSupported] = useState(false);
+  // Start with `supported: true` so the mic button renders during SSR
+  // and the initial client render. The first useEffect flips it to
+  // false in unsupported browsers (Firefox today). The previous
+  // behavior — start false → flip true on hydrate — caused the button
+  // to be missing for the first few hundred ms of every page load
+  // even in browsers that DO support it.
+  const [supported, setSupported] = useState(true);
 
   useEffect(() => {
     setSupported(getRecognitionCtor() !== null);

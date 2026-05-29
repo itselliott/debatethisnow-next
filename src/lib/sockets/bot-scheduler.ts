@@ -62,6 +62,18 @@ async function runHouseTurn(
     // chunks with the right placeholder bubble — multiple bots can
     // stream in the same room if we ever support n-way debates.
     const streamId = `stream-${debateId}-${botId}-${Date.now()}`;
+    // Always announce that the bot is thinking — gives the UI a
+    // placeholder bubble regardless of whether the brain supports
+    // token-by-token streaming. Groq streams real content into this
+    // same bubble; other brains leave it on "Thinking…" until the
+    // full response arrives + the persisted message replaces it.
+    io.to(room).emit("argument_streaming", {
+      debate_id: debateId,
+      stream_id: streamId,
+      author_id: botId,
+      author_username: author,
+      partial_content: "",
+    });
     let lastEmitted = "";
     let lastEmitAt = 0;
     const onChunk = (cumulative: string) => {

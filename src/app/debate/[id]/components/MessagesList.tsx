@@ -70,6 +70,7 @@ function StreamingBubble({
   author: string;
   content: string;
 }) {
+  const empty = content.length === 0;
   return (
     <article className="rounded border border-red bg-paper p-3 shadow-press-sm">
       <header className="flex items-center justify-between text-xs">
@@ -78,16 +79,26 @@ function StreamingBubble({
           Live
         </span>
         <span className="font-condensed uppercase tracking-wider text-sepia">
-          {author} · typing…
+          {author} · {empty ? "thinking…" : "typing…"}
         </span>
       </header>
-      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
-        {content}
-        <span
-          aria-hidden
-          className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-ink"
-        />
-      </p>
+      {empty ? (
+        // No tokens yet — render three pulsing dots so the user sees
+        // immediate feedback that the bot's request is in flight.
+        <p className="mt-2 flex gap-1 text-sm text-sepia">
+          <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-sepia [animation-delay:-0.2s]" />
+          <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-sepia [animation-delay:-0.1s]" />
+          <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-sepia" />
+        </p>
+      ) : (
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+          {content}
+          <span
+            aria-hidden
+            className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-ink"
+          />
+        </p>
+      )}
     </article>
   );
 }

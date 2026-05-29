@@ -10,11 +10,15 @@
  */
 
 @theme inline {
-  /* Paper / ink — vintage WPA */
-  --color-paper: #f1e6c8;
-  --color-paper-2: #f7eed4;
-  --color-paper-3: #e6d8b0;
-  --color-paper-4: #d8c692;
+  /* Paper / ink — clean off-white parchment. Earlier values
+   * (#f1e6c8 etc.) were a saturated WPA-poster yellow that read
+   * "vintage" but also "tinted". This palette keeps the slight
+   * warmth + paper feel without the over-saturation, making it
+   * easier on the eyes for long debate sessions. */
+  --color-paper: #faf7f0;
+  --color-paper-2: #fdfbf5;
+  --color-paper-3: #ede5d3;
+  --color-paper-4: #d8ccb4;
   --color-ink: #182846;
   --color-ink-soft: #2a3f63;
   --color-sepia: #6b5a36;
@@ -68,7 +72,10 @@
     content: "";
     position: fixed;
     inset: 0;
-    background-image: radial-gradient(rgba(24, 40, 70, 0.07) 1px, transparent 1px);
+    /* Subtler halftone — was rgba(... 0.07); too heavy against the
+     * old yellow paper and even heavier against the new off-white.
+     * 0.035 reads as paper grain rather than dotted overlay. */
+    background-image: radial-gradient(rgba(24, 40, 70, 0.035) 1px, transparent 1px);
     background-size: 14px 14px;
     mix-blend-mode: multiply;
     pointer-events: none;

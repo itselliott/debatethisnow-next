@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useSocket } from "@/lib/hooks/use-socket";
 import type { FriendshipDict } from "@/lib/serializers/friendship";
+import { ChallengeDialog } from "@/components/ChallengeDialog";
 
 interface SearchResult {
   id: number;
@@ -19,6 +20,7 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
   const socket = useSocket();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [challengeTarget, setChallengeTarget] = useState<string | null>(null);
   void viewerId;
 
   // Debounced search — 200ms after last keystroke, minimum 2 chars.
@@ -176,19 +178,28 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
                     Elo {r.elo_rating} · {r.rank_tier}
                   </div>
                 </div>
-                {r.relationship === "none" ? (
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => sendRequest(r.username)}
-                    className="rounded bg-red px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper hover:opacity-90"
+                    onClick={() => setChallengeTarget(r.username)}
+                    className="rounded border-2 border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"
                   >
-                    Add Friend
+                    Challenge
                   </button>
-                ) : (
-                  <span className="font-condensed text-xs uppercase tracking-wider text-sepia">
-                    {r.relationship.replaceAll("_", " ")}
-                  </span>
-                )}
+                  {r.relationship === "none" ? (
+                    <button
+                      type="button"
+                      onClick={() => sendRequest(r.username)}
+                      className="rounded bg-red px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper hover:opacity-90"
+                    >
+                      Add Friend
+                    </button>
+                  ) : (
+                    <span className="self-center font-condensed text-xs uppercase tracking-wider text-sepia">
+                      {r.relationship.replaceAll("_", " ")}
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -257,6 +268,13 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
         </Panel>
       </section>
 
+      {challengeTarget ? (
+        <ChallengeDialog
+          targetUsername={challengeTarget}
+          onClose={() => setChallengeTarget(null)}
+        />
+      ) : null}
+
       <Panel title="Friends">
         {friends.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
@@ -272,13 +290,25 @@ export function FriendsClient({ viewerId }: { viewerId: number }) {
                 <span className="font-display">
                   {fr.friend?.username ?? "?"}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => remove(fr.id)}
-                  className="rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-red hover:text-paper"
-                >
-                  Remove
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = fr.friend?.username;
+                      if (name) setChallengeTarget(name);
+                    }}
+                    className="rounded bg-red px-3 py-1 font-condensed text-xs uppercase tracking-wider text-paper hover:opacity-90"
+                  >
+                    Challenge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(fr.id)}
+                    className="rounded border border-ink px-3 py-1 font-condensed text-xs uppercase tracking-wider hover:bg-red hover:text-paper"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

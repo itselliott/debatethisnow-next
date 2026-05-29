@@ -9,6 +9,8 @@ import { toPublicDict } from "@/lib/serializers/user";
 import { toUserStatsDict } from "@/lib/serializers/user-stats";
 import { toDebateDict } from "@/lib/serializers/debate";
 import { toUserAchievementDict } from "@/lib/serializers/achievement";
+import { getCurrentUser } from "@/lib/auth/server";
+import { ProfileChallengeButton } from "./ProfileChallengeButton";
 
 export const metadata = { title: "Profile · DebateThis" };
 
@@ -53,17 +55,30 @@ export default async function ProfilePage({
   const stats = user.stats ? toUserStatsDict(user.stats) : null;
   const achievements = achievementRows.map(toUserAchievementDict);
 
+  // "Challenge" button only renders for authed viewers looking at
+  // someone else's profile. You can't challenge yourself, anon visitors
+  // can't challenge anyone (signup first), and bots aren't challengeable
+  // through this flow (they're staged via /bots).
+  const viewer = await getCurrentUser();
+  const canChallenge =
+    viewer !== null && viewer.id !== user.id && !user.is_bot;
+
   return (
     <div className="space-y-6">
-      <header className="border-b-[3px] border-double border-ink pb-4">
-        <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-          {d.rank_tier}
-        </span>
-        <h1 className="mt-1 font-display text-3xl">{d.username}</h1>
-        <p className="text-sm text-sepia">
-          Elo <strong className="font-display text-ink">{d.elo_rating}</strong>{" "}
-          · {d.wins} W / {d.losses} L · {d.win_rate}%
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b-[3px] border-double border-ink pb-4">
+        <div>
+          <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
+            {d.rank_tier}
+          </span>
+          <h1 className="mt-1 font-display text-3xl">{d.username}</h1>
+          <p className="text-sm text-sepia">
+            Elo <strong className="font-display text-ink">{d.elo_rating}</strong>{" "}
+            · {d.wins} W / {d.losses} L · {d.win_rate}%
+          </p>
+        </div>
+        {canChallenge ? (
+          <ProfileChallengeButton targetUsername={d.username} />
+        ) : null}
       </header>
 
       {stats ? (
