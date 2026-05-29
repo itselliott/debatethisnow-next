@@ -9,6 +9,11 @@
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { Mutex } from "@/lib/utils/mutex";
+import {
+  TOPIC_CATALOG,
+  trendingFromCatalog,
+  type CatalogTopic,
+} from "@/lib/topics/catalog";
 import type {
   Debate,
   MatchmakingQueue,
@@ -17,31 +22,34 @@ import type {
 
 export const matchmakingMutex = new Mutex();
 
-// Same 10 topics as [app/services/matchmaking_service.py:TRENDING_TOPICS].
-export const TRENDING_TOPICS: ReadonlyArray<{ topic: string; category: string }> = [
-  { topic: "Social media has done more harm than good", category: "Society" },
-  { topic: "AI should be regulated like nuclear technology", category: "Technology" },
-  { topic: "Universal basic income is inevitable", category: "Economics" },
-  { topic: "Voting should be mandatory", category: "Politics" },
-  { topic: "Free will is an illusion", category: "Philosophy" },
-  { topic: "Capitalism has outlived its usefulness", category: "Economics" },
-  { topic: "Genetic engineering of humans is ethical", category: "Ethics" },
-  { topic: "Remote work is better for everyone", category: "Society" },
-  { topic: "Privacy is dead in the digital age", category: "Technology" },
-  {
-    topic: "Democracy is the worst form of government — except all the others",
-    category: "Politics",
-  },
-];
-
+/**
+ * Trending topics — now sourced from the much larger topics catalog
+ * in `src/lib/topics/catalog.ts`. The dashboard panel and the
+ * matchmaking picker both call this; the function uses a date-pinned
+ * seed so today's "trending" set is the same across an app server
+ * lifetime (changes daily) and balanced across categories — no more
+ * five-Politics-in-a-row dashboards.
+ */
 export function trendingTopics(
   limit = 8,
 ): ReadonlyArray<{ topic: string; category: string }> {
-  return TRENDING_TOPICS.slice(0, limit);
+  // Seed = (yyyymmdd) so the set rotates daily but is stable within
+  // a day. Pure function of the date — no DB write needed.
+  const now = new Date();
+  const seed =
+    now.getUTCFullYear() * 10000 +
+    (now.getUTCMonth() + 1) * 100 +
+    now.getUTCDate();
+  return trendingFromCatalog(limit, seed).map((t) => ({
+    topic: t.topic,
+    category: t.category,
+  }));
 }
 
 export function randomTopic(): { topic: string; category: string } {
-  return TRENDING_TOPICS[Math.floor(Math.random() * TRENDING_TOPICS.length)]!;
+  const t: CatalogTopic =
+    TOPIC_CATALOG[Math.floor(Math.random() * TOPIC_CATALOG.length)]!;
+  return { topic: t.topic, category: t.category };
 }
 
 /**

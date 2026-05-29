@@ -70,6 +70,7 @@ export type PhraseKey =
   | "nav_home"
   | "nav_rankings"
   | "nav_my_debates"
+  | "nav_topics"
   | "nav_friends"
   | "nav_bots"
   | "nav_blog"
@@ -344,6 +345,7 @@ const PHRASES: Record<PhraseKey, Entry> = {
   nav_home: { en: "Home", es: "Inicio" },
   nav_rankings: { en: "Rankings", es: "Clasificación" },
   nav_my_debates: { en: "My Debates", es: "Mis Debates" },
+  nav_topics: { en: "Topics", es: "Temas" },
   nav_friends: { en: "Friends", es: "Amigos" },
   nav_bots: { en: "Bot Arena", es: "Arena de Bots" },
   nav_blog: { en: "Blog", es: "Blog" },

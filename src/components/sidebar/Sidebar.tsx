@@ -32,6 +32,7 @@ interface NavLink {
 // Full nav for authenticated users.
 const AUTHED_NAV: NavLink[] = [
   { href: "/dashboard", labelKey: "nav_home" },
+  { href: "/topics", labelKey: "nav_topics" },
   { href: "/leaderboard", labelKey: "nav_rankings" },
   { href: "/profile", labelKey: "nav_my_debates" },
   { href: "/achievements", labelKey: "nav_achievements" },
@@ -42,12 +43,13 @@ const AUTHED_NAV: NavLink[] = [
   { href: "/settings", labelKey: "nav_settings" },
 ];
 
-// Trimmed nav for anonymous spectators. Everything else (Home, My
-// Debates, Friends, Settings) requires an account; Blog + How It
-// Works are still discoverable via direct URLs and the landing page.
-// The sidebar stays focused on the two surfaces an anon user can
-// actually use: see who's winning, watch the bots argue.
+// Trimmed nav for anonymous spectators. Topics is included because
+// the catalog is browseable without a login (queueing is gated, but
+// browsing isn't). Everything else (Home, My Debates, Friends,
+// Settings) requires an account; Blog + How It Works are still
+// discoverable via direct URLs and the landing page.
 const ANON_NAV: NavLink[] = [
+  { href: "/topics", labelKey: "nav_topics" },
   { href: "/leaderboard", labelKey: "nav_rankings" },
   { href: "/bots", labelKey: "nav_bots" },
 ];

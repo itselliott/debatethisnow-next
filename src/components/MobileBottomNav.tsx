@@ -32,6 +32,7 @@ const PRIMARY_TABS: Tab[] = [
 ];
 
 const MORE_LINKS: Tab[] = [
+  { href: "/topics", labelKey: "nav_topics", icon: "✸" },
   { href: "/profile", labelKey: "nav_profile", icon: "☻" },
   { href: "/blog", labelKey: "nav_blog", icon: "✎" },
   { href: "/how-it-works", labelKey: "nav_how_it_works", icon: "?" },
