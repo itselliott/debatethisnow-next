@@ -222,14 +222,14 @@ function SidebarFooter() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 text-[11px] text-paper-3">
+      <div className="flex items-center justify-center gap-4 text-xs text-paper-3">
         <Link href="/terms" className="hover:text-gold">
           {t("nav_terms")}
         </Link>
-        {/* Small Old-Glory between Terms and Privacy. SVG inline so it
+        {/* Old-Glory between Terms and Privacy. SVG inline so it
          * doesn't depend on an external asset and renders at any
          * zoom level without aliasing. Decorative — aria-hidden. */}
-        <FlagUSA className="h-2.5 w-auto shrink-0" />
+        <FlagUSA className="h-4 w-auto shrink-0" />
         <Link href="/privacy" className="hover:text-gold">
           {t("nav_privacy")}
         </Link>

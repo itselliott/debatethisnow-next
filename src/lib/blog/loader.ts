@@ -34,6 +34,31 @@ function parseDate(d: string): number {
   return Number.isFinite(t) ? t : 0;
 }
 
+/**
+ * Normalise a frontmatter date into ISO YYYY-MM-DD form.
+ *
+ * YAML's unquoted-date form (`date: 2026-05-29`) is auto-parsed by
+ * gray-matter into a JS Date — so a bare `String(data.date)` produces
+ * "Fri May 29 2026 00:00:00 GMT+0000 (Coordinated Universal Time)",
+ * which then leaks into the article header. Map back to ISO so the
+ * client sees the format it expects regardless of how the frontmatter
+ * was written.
+ */
+function isoFromFrontmatterDate(raw: unknown): string {
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    // .toISOString() is yyyy-mm-ddThh:mm:ss.sssZ; slice the date head.
+    return raw.toISOString().slice(0, 10);
+  }
+  const s = String(raw ?? "").trim();
+  // Already ISO-ish? Pass through.
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  // Anything else (e.g. "May 29, 2026") — try to parse, fall back to
+  // the raw string so we never throw.
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) return new Date(t).toISOString().slice(0, 10);
+  return s;
+}
+
 export function listArticles(): ArticleMeta[] {
   if (!fs.existsSync(ARTICLES_DIR)) return [];
   const files = fs.readdirSync(ARTICLES_DIR).filter((f) => f.endsWith(".md"));
@@ -47,7 +72,7 @@ export function listArticles(): ArticleMeta[] {
       slug: slugFromFilename(file),
       title,
       description: String(data.description ?? ""),
-      date: String(data.date ?? ""),
+      date: isoFromFrontmatterDate(data.date),
       tags: Array.isArray(data.tags)
         ? data.tags.map((t) => String(t))
         : [],
@@ -70,7 +95,7 @@ export function loadArticle(slug: string): Article | null {
     slug: safe,
     title: String(data.title ?? safe),
     description: String(data.description ?? ""),
-    date: String(data.date ?? ""),
+    date: isoFromFrontmatterDate(data.date),
     tags: Array.isArray(data.tags) ? data.tags.map((t) => String(t)) : [],
     redirect_to:
       typeof data.redirect_to === "string" ? data.redirect_to : undefined,

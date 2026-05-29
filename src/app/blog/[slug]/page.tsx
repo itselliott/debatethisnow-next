@@ -62,6 +62,32 @@ const SITE_DEBATE_KEYWORDS = [
   "1v1 debate",
 ];
 
+/**
+ * Format an ISO date string (YYYY-MM-DD) as "Fri. May 29 2026" for
+ * the article header byline. Parses as UTC so the displayed day
+ * doesn't shift by timezone — a post dated 2026-05-29 reads as
+ * May 29 in Tokyo and in LA.
+ */
+function formatArticleDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])),
+  );
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = d.toLocaleDateString("en-US", {
+    weekday: "short",
+    timeZone: "UTC",
+  });
+  const monthDay = d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  const year = d.getUTCFullYear();
+  return `${day}. ${monthDay} ${year}`;
+}
+
 export async function generateStaticParams() {
   return listArticles().map((a) => ({ slug: a.slug }));
 }
@@ -235,9 +261,26 @@ export default async function ArticlePage({
         {article.description ? (
           <p className="mt-1 text-base text-sepia">{article.description}</p>
         ) : null}
-        <div className="mt-2 flex items-center gap-3 text-xs text-sepia">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-sepia">
           {article.date ? (
-            <time dateTime={article.date}>{article.date}</time>
+            <span className="flex items-center gap-1">
+              <time dateTime={article.date}>
+                {formatArticleDate(article.date)}
+              </time>
+              <span>by -</span>
+              {/* External link to the author's GitHub Pages site.
+               * rel="me" hints to consumers (Mastodon, indieauth) that
+               * the destination is the author's verified profile.
+               * target=_blank gets a noopener for tabnabbing safety. */}
+              <a
+                href="https://itselliott.github.io"
+                target="_blank"
+                rel="me noopener noreferrer"
+                className="text-red underline decoration-2 underline-offset-2 hover:text-red-dark"
+              >
+                itselliott
+              </a>
+            </span>
           ) : null}
           {article.tags.length > 0 ? (
             <div className="flex flex-wrap gap-1">
