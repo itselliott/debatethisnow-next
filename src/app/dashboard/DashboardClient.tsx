@@ -56,7 +56,7 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
       ) : null,
     cta: () => <CtaTiles />,
     live: () => (
-      <Panel title={t("live_debates_title")}>
+      <Panel title={t("live_debates_title")} icon="⚡">
         {active.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
         ) : (active.data?.debates ?? []).length === 0 ? (
@@ -69,7 +69,7 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
       </Panel>
     ),
     trending: () => (
-      <Panel title={t("trending_title")}>
+      <Panel title={t("trending_title")} icon="↗">
         {trending.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
         ) : (
@@ -92,7 +92,7 @@ export function DashboardClient({ userId, username }: DashboardClientProps) {
       </Panel>
     ),
     past: () => (
-      <Panel title={t("past_debates_title")}>
+      <Panel title={t("past_debates_title")} icon="⌛">
         {myPast.isLoading ? (
           <p className="text-sm text-sepia">Loading…</p>
         ) : (myPast.data?.debates ?? []).length === 0 ? (
@@ -239,14 +239,26 @@ function DraggablePanel({
 
 function Panel({
   title,
+  icon,
   children,
 }: {
   title: string;
+  // Optional leading glyph rendered inline before the title. Treated
+  // as decorative — actual icon semantics are carried by the title
+  // text for screen readers.
+  icon?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded border border-ink bg-paper-2 p-5 shadow-press">
-      <h2 className="mb-3 font-display text-xl">{title}</h2>
+      <h2 className="mb-3 flex items-center gap-2 font-display text-xl">
+        {icon ? (
+          <span aria-hidden className="text-2xl leading-none text-red">
+            {icon}
+          </span>
+        ) : null}
+        <span>{title}</span>
+      </h2>
       {children}
     </section>
   );
@@ -301,7 +313,10 @@ function ChallengesCard({
   void viewerId;
   return (
     <section className="rounded border border-ink bg-paper-2 p-5 shadow-press">
-      <h2 className="mb-3 font-display text-xl">Challenges</h2>
+      <h2 className="mb-3 flex items-center gap-2 font-display text-xl">
+        <span aria-hidden className="text-2xl leading-none text-red">⚔</span>
+        <span>Challenges</span>
+      </h2>
       <ul className="space-y-3">
         {challenges.map((c) => (
           <li
@@ -395,6 +410,11 @@ function CtaTiles() {
         onClick={() => setChallengeOpen(true)}
         className="relative rounded border border-ink bg-paper-2 p-5 text-left shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
       >
+        {/* Watermark icon top-right — visible without competing with
+         * the title for the user's reading eye. Each tile uses a
+         * different symbol so the grid is scanable at a glance even
+         * when read sideways on mobile. */}
+        <CtaIcon glyph="⚔" />
         <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
           Challenge
         </div>
@@ -407,6 +427,7 @@ function CtaTiles() {
         href="/matchmaking?random=1"
         className="relative rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
       >
+        <CtaIcon glyph="⚄" />
         <div className="flex items-center justify-between">
           <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
             Random
@@ -420,8 +441,9 @@ function CtaTiles() {
       {/* Tile 3 — Watch bots. */}
       <Link
         href="/bots"
-        className="rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
+        className="relative rounded border border-ink bg-paper-2 p-5 shadow-press transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
       >
+        <CtaIcon glyph="◉" />
         <div className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
           Showcase
         </div>
@@ -433,6 +455,22 @@ function CtaTiles() {
         <OpenChallengeDialog onClose={() => setChallengeOpen(false)} />
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Small watermark-style icon pinned to the top-right corner of a CTA
+ * tile. Uses sepia tone so it reads as decoration, not as the focal
+ * element — the title still gets the user's eye.
+ */
+function CtaIcon({ glyph }: { glyph: string }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute right-4 top-4 text-2xl leading-none text-sepia opacity-60"
+    >
+      {glyph}
+    </span>
   );
 }
 

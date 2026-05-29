@@ -234,7 +234,10 @@ function TrendingPanel() {
   return (
     <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-display text-lg">Trending Topics</h2>
+        <h2 className="flex items-center gap-2 font-display text-lg">
+          <span aria-hidden className="text-xl leading-none text-red">↗</span>
+          <span>Trending Topics</span>
+        </h2>
         <span className="font-condensed text-[10px] uppercase tracking-wider text-sepia">
           Rotates daily
         </span>
