@@ -12,7 +12,7 @@
  */
 import { ACCESS_COOKIE } from "@/lib/auth/cookies";
 import { verifyToken, type DTClaims } from "@/lib/auth/jwt";
-import { isRevoked } from "@/lib/services/token-service";
+import { isRevoked, isUserTokenStale } from "@/lib/services/token-service";
 import { prisma } from "@/lib/db";
 import type { User } from "@prisma/client";
 
@@ -87,6 +87,9 @@ async function verifyJwtAndLoad(token: string): Promise<ResolvedUser | null> {
   if (isRevoked(claims.jti)) return null;
   const userId = Number.parseInt(claims.sub, 10);
   if (!Number.isInteger(userId)) return null;
+  // Single-session enforcement — reject tokens older than the user's
+  // most recent login cutoff.
+  if (isUserTokenStale(userId, claims.iat)) return null;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.is_banned) return null;
   return { user, claims };

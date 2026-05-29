@@ -17,6 +17,7 @@ import { signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
 import { setAuthCookies } from "@/lib/auth/cookies";
 import { toPrivateDict } from "@/lib/serializers/user";
 import { parseRateLimit, rateCheck, clientIp } from "@/lib/rate-limit";
+import { revokeUserTokensBefore } from "@/lib/services/token-service";
 import { env } from "@/lib/env";
 
 const Body = z.object({
@@ -79,6 +80,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const user = await authenticate({ identifier: id, password });
+    // Single-session enforcement — bump the user's iat cutoff BEFORE
+    // minting the new pair. Any token issued before this moment (i.e.
+    // another browser window, mobile tab, leftover session) becomes
+    // stale on its next auth check. The new access/refresh below carry
+    // iat == now-or-later, so they sit on the live side of the cutoff.
+    revokeUserTokensBefore(user.id, Math.floor(Date.now() / 1000));
     const access = await signAccessToken(user.id);
     const refresh = await signRefreshToken(user.id);
     const jar = await cookies();

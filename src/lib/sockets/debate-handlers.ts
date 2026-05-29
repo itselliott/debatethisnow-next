@@ -45,6 +45,24 @@ function debateRoom(debateId: number): string {
   return `debate:${debateId}`;
 }
 
+/**
+ * Synthesize a stable negative-integer "userId" for an anonymous
+ * socket connection. Keeps the user-id space for anon spectators
+ * disjoint from real users (positive integers from the DB), so the
+ * spectator-count Set in state.ts can hold both without collision.
+ *
+ * Used by onJoinDebate so anon viewers can sit in the debate room and
+ * receive broadcast events (the end-screen result modal in
+ * particular) without needing to be logged in.
+ */
+function anonUserIdFromSid(sid: string): number {
+  let hash = 0;
+  for (let i = 0; i < sid.length; i++) {
+    hash = ((hash << 5) - hash + sid.charCodeAt(i)) | 0;
+  }
+  return -(Math.abs(hash) || 1);
+}
+
 export function registerDebateHandlers(io: SocketIOServer): void {
   io.on("connection", (socket: Socket) => {
     socket.on("join_debate", (data: unknown) => {
@@ -141,11 +159,21 @@ async function onJoinDebate(
   data: unknown,
 ): Promise<void> {
   const debateId = debateIdFrom(data);
-  const user = await userFromHandlerPayload(socket, data);
-  if (!user || !debateId) {
-    socket.emit("error", { message: "missing_auth_or_debate" });
+  if (!debateId) {
+    socket.emit("error", { message: "missing_debate" });
     return;
   }
+  // Anon spectators are allowed to join — they get a synthetic
+  // negative id for presence counting, can't act on any handler that
+  // requires auth (every other handler in this file calls
+  // userFromHandlerPayload and rejects null), but DO receive room
+  // broadcasts (debate_state, vote_update, debate_finished). This is
+  // the fix for "anon viewers don't see the end-of-debate score
+  // window on bot-vs-bot showcases" — they were being rejected here
+  // before joining the room, so the result modal never reached them.
+  const user = await userFromHandlerPayload(socket, data);
+  const isAnon = !user;
+  const trackingUserId = user?.id ?? anonUserIdFromSid(socket.id);
   const d = await prisma.debate.findUnique({
     where: { id: debateId },
     include: {
@@ -161,10 +189,11 @@ async function onJoinDebate(
     socket.emit("error", { message: "debate_not_found" });
     return;
   }
-  // Spectator block check.
+  // Spectator block check — only meaningful for authed viewers; anon
+  // has no block relationships, same logic the SSR page uses.
   const isParticipant =
-    user.id === d.player1_id || user.id === d.player2_id;
-  if (!isParticipant) {
+    !isAnon && (user!.id === d.player1_id || user!.id === d.player2_id);
+  if (user && !isParticipant) {
     for (const pid of [d.player1_id, d.player2_id]) {
       if (pid && (await isBlockedEitherWay(user.id, pid))) {
         socket.emit("error", { message: "debate_not_found" });
@@ -178,8 +207,8 @@ async function onJoinDebate(
   // socket. (Order matters — the previous block called trackRoomJoin
   // AFTER the start-turn logic, which meant a self-check couldn't
   // see itself.)
-  const count = trackRoomJoin(socket.id, d.id, user.id, !isParticipant);
-  if (isParticipant) cancelForfeit(d.id, user.id);
+  const count = trackRoomJoin(socket.id, d.id, trackingUserId, !isParticipant);
+  if (isParticipant && user) cancelForfeit(d.id, user.id);
 
   // ---- Both-ready countdown ----
   //
@@ -256,7 +285,9 @@ async function onJoinDebate(
     }
   }
 
-  const existingVote = await getUserVote(d.id, user.id);
+  // Vote lookup only makes sense for authed viewers — anon can't
+  // have a vote record (DB rows are keyed on user_id).
+  const existingVote = user ? await getUserVote(d.id, user.id) : null;
   const statePayload: Record<string, unknown> = {
     ...toDebateDict(d, { includeMessages: true }),
     my_role: isParticipant ? "participant" : "spectator",
@@ -270,12 +301,18 @@ async function onJoinDebate(
     count,
   });
 
-  socket.broadcast.to(debateRoom(d.id)).emit("presence", {
-    debate_id: d.id,
-    user: toPublicDict(user),
-    joined: true,
-    is_spectator: !isParticipant,
-  });
+  // Presence ping — only fires for authed users (the payload needs a
+  // serializable User dict; anon doesn't have one). Other clients get
+  // the count bump from `spectator_count` above, which is the
+  // visible signal that matters.
+  if (user) {
+    socket.broadcast.to(debateRoom(d.id)).emit("presence", {
+      debate_id: d.id,
+      user: toPublicDict(user),
+      joined: true,
+      is_spectator: !isParticipant,
+    });
+  }
 
   // Server-restart recovery: re-arm the turn timer if one was running
   // server-side but the worker died with the previous process.
@@ -529,11 +566,10 @@ async function onReadyForTurn(
 }
 
 async function onRequestState(socket: Socket, data: unknown): Promise<void> {
-  const user = await userFromHandlerPayload(socket, data);
-  if (!user) {
-    socket.emit("error", { message: "unauthenticated" });
-    return;
-  }
+  // Read-only — anon spectators are allowed here too (they need to
+  // re-sync after a socket reconnect, same as authed viewers). The
+  // mutation handlers above still gate on user; this one doesn't
+  // touch anything, just emits the canonical debate_state back.
   if (rateLimited(socket.id, "request_state", 10, 5000)) {
     socket.emit("error", { message: "rate_limited" });
     return;

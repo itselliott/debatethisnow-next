@@ -31,25 +31,25 @@ interface NprStation {
   url: string;
 }
 
-// Curated NPR affiliates that run their OWN ICEcast servers without
-// token auth. These three are the only major-metro public radio
-// stations we can rely on long-term:
+// Curated NPR affiliates that embed cleanly in a plain `<audio>` element
+// (no HLS, no token auth, no CORS preflight). The major-metro flagships
+// + the NPR News Now national feed cover most listeners.
 //
-//   - WBEZ, WNYC — broadcaster-owned anonymous ICEcast
-//   - WFMT — uses StreamGuys but with no auth layer
+//   - National  → NPR News Now hourly headlines (ICEcast direct)
+//   - Chicago   → WBEZ broadcaster-owned anonymous ICEcast
+//   - New York  → WNYC broadcaster-owned anonymous ICEcast
 //
-// Other major affiliates (KCRW, WAMU, KQED, WHYY, KUT, NPR News Now)
-// route through third-party CDNs that have been incrementally moving
-// behind token-based auth since 2024. A plain `<audio>` element can't
-// do the token handshake, so those URLs return 403 to anonymous
-// fetches even though the stations are clearly broadcasting on their
-// own sites. We deliberately keep them OFF this list rather than ship
-// presets that intermittently 403 — a short list of working stations
-// reads as polish; a long list with broken buttons reads as bugs.
+// Other major affiliates (KCRW, WAMU, KQED, WHYY, KUT, WFMT) route
+// through third-party CDNs that have been incrementally moving behind
+// token-based auth since 2024. A plain `<audio>` element can't do the
+// token handshake, so those URLs return 403 to anonymous fetches even
+// though the stations are clearly broadcasting on their own sites. We
+// deliberately keep them OFF this list — short and reliable beats long
+// and flaky.
 const STATIONS: NprStation[] = [
-  { city: "Chicago",  call: "WBEZ", freq: "91.5", url: "https://stream.wbez.org/wbez128.mp3" },
-  { city: "New York", call: "WNYC", freq: "93.9", url: "https://fm939.wnyc.org/wnycfm" },
-  { city: "Chicago",  call: "WFMT", freq: "98.7", url: "https://wfmt-ice.streamguys1.com/wfmt-aac" },
+  { city: "National", call: "NPR News Now", freq: "live", url: "https://npr-ice.streamguys1.com/live.mp3" },
+  { city: "Chicago",  call: "WBEZ",         freq: "91.5", url: "https://stream.wbez.org/wbez128.mp3" },
+  { city: "New York", call: "WNYC",         freq: "93.9", url: "https://fm939.wnyc.org/wnycfm" },
 ];
 
 const KEY_STATION_INDEX = "debatethis.radio.stationIndex";
@@ -198,19 +198,19 @@ export function RadioWidget() {
       className="hidden md:block"
     >
       {!expanded ? (
-        // Collapsed chip — current station + play indicator.
+        // Collapsed chip — just shows "NPR" + play indicator. Keeping
+        // the label short avoids the chip dancing in width every time
+        // the user picks a station with a longer callsign.
         <button
           type="button"
           onClick={() => setExpanded(true)}
           className="flex items-center gap-2 rounded border-2 border-ink bg-paper-2 px-3 py-1.5 font-condensed text-xs uppercase tracking-wider shadow-press-sm hover:bg-ink hover:text-paper"
-          title={`${station.call} · NPR ${station.city}`}
+          title={`${station.call} · ${station.city}`}
         >
           <span aria-hidden className={playing ? "text-red" : "text-sepia"}>
             {playing ? "●" : "○"}
           </span>
-          <span>
-            {station.call} {station.freq}
-          </span>
+          <span>NPR</span>
         </button>
       ) : (
         // Expanded panel — city picker + play + volume.

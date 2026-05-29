@@ -52,15 +52,62 @@ export function isRevoked(jti: string | null | undefined): boolean {
 }
 
 /**
- * Stub. Bumping a per-user token_version claim would be the right shape;
- * out of scope for cutover. Logout per-jti covers the common cases.
+ * Per-user iat-cutoff map for single-session enforcement.
+ *
+ * Pattern: instead of tracking every active jti per user (which would
+ * require enumerating tokens at logout), we keep one "minimum iat"
+ * timestamp per user. Any access/refresh token whose `iat` claim is
+ * BEFORE this timestamp is treated as revoked.
+ *
+ * The /api/auth/login route bumps this cutoff to `now` on every
+ * successful login — which means any prior browser/tab/window holding
+ * an older token is logged out the moment that user signs in
+ * somewhere else.
+ *
+ * Survives the same restart caveat as STORE: a server restart resets
+ * the map, which is acceptable (effectively re-validates everyone's
+ * existing tokens — preferable to forcing a global re-login on every
+ * deploy). Swap for Redis if we ever go multi-process.
  */
-export function revokeAllForUser(_userId: number): void {
-  // intentionally a no-op for now
+const USER_MIN_IAT = new Map<number, number>();
+
+/** Set the user's iat cutoff to the given unix-seconds timestamp. */
+export function revokeUserTokensBefore(
+  userId: number,
+  atSeconds: number,
+): void {
+  const prev = USER_MIN_IAT.get(userId) ?? 0;
+  if (atSeconds > prev) USER_MIN_IAT.set(userId, atSeconds);
+}
+
+/**
+ * Return true if the given JWT's `iat` (issued-at) predates the
+ * user's most recent revoke cutoff. Callers should treat true the
+ * same way they treat `isRevoked` — drop the auth check, return null
+ * / 401.
+ */
+export function isUserTokenStale(
+  userId: number,
+  iatSeconds: number | undefined,
+): boolean {
+  if (typeof iatSeconds !== "number") return false;
+  const cutoff = USER_MIN_IAT.get(userId);
+  if (cutoff === undefined) return false;
+  return iatSeconds < cutoff;
+}
+
+/**
+ * Force-logout every active session for a user. Now backed by the
+ * iat-cutoff map above — every token with iat older than `now` is
+ * rejected. Used by the login route to enforce single-session.
+ */
+export function revokeAllForUser(userId: number): void {
+  revokeUserTokensBefore(userId, Math.floor(Date.now() / 1000));
 }
 
 /** Test-only — exposed so vitest fixtures can reset state between runs. */
 export function _resetTokenStore(): void {
   STORE.clear();
+  USER_MIN_IAT.clear();
   lastSweepMs = 0;
 }

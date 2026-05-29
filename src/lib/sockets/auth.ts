@@ -12,7 +12,7 @@
 import type { Socket } from "socket.io";
 import { ACCESS_COOKIE } from "@/lib/auth/cookies";
 import { verifyToken } from "@/lib/auth/jwt";
-import { isRevoked } from "@/lib/services/token-service";
+import { isRevoked, isUserTokenStale } from "@/lib/services/token-service";
 import { prisma } from "@/lib/db";
 import type { User } from "@prisma/client";
 
@@ -86,6 +86,10 @@ async function userFromToken(token: string | null): Promise<User | null> {
   if (isRevoked(claims.jti)) return null;
   const userId = Number.parseInt(claims.sub, 10);
   if (!Number.isInteger(userId)) return null;
+  // Single-session enforcement — reject tokens older than the user's
+  // most recent login cutoff. Mirrors the same check in the HTTP
+  // auth paths so a stale socket can't outlive its cookie.
+  if (isUserTokenStale(userId, claims.iat)) return null;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.is_banned) return null;
   return user;

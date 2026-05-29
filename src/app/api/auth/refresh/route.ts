@@ -12,7 +12,7 @@ import {
   setAccessCookies,
 } from "@/lib/auth/cookies";
 import { signAccessToken, verifyToken } from "@/lib/auth/jwt";
-import { isRevoked } from "@/lib/services/token-service";
+import { isRevoked, isUserTokenStale } from "@/lib/services/token-service";
 import { prisma } from "@/lib/db";
 
 export async function POST(_req: NextRequest) {
@@ -44,6 +44,15 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json(
       { error: "invalid_token" },
       { status: 422 },
+    );
+  }
+  // Single-session enforcement — refresh tokens issued before the
+  // user's latest login are stale even though their JWT signature is
+  // still valid.
+  if (isUserTokenStale(userId, claims.iat)) {
+    return NextResponse.json(
+      { error: "token_revoked", message: "Session ended" },
+      { status: 401 },
     );
   }
   const user = await prisma.user.findUnique({ where: { id: userId } });
