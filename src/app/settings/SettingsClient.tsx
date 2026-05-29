@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useLang, useTone } from "@/lib/hooks/use-tone";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { useTheme, type Theme } from "@/lib/hooks/use-theme";
 import { AVATAR_CATEGORIES, displayAvatar } from "@/lib/avatars";
 import type { Lang } from "@/lib/tone/phrases";
 
@@ -67,6 +68,8 @@ export function SettingsClient({
       </header>
 
       <AvatarSection username={username} />
+
+      <ThemeSection />
 
       <ToneSection />
 
@@ -184,6 +187,80 @@ function ToneOption({
         {sub}
       </div>
     </button>
+  );
+}
+
+function ThemeSection() {
+  const { theme, effective, setTheme } = useTheme();
+  const options: Array<{
+    value: Theme;
+    label: string;
+    sub: string;
+    icon: string;
+  }> = [
+    {
+      value: "light",
+      label: "Light",
+      sub: "Warm parchment, dark ink.",
+      icon: "☀",
+    },
+    {
+      value: "dark",
+      label: "Dark",
+      sub: "Warm dark mode for late nights.",
+      icon: "☾",
+    },
+    {
+      value: "auto",
+      label: "Auto",
+      sub: "Follow your system preference.",
+      icon: "◐",
+    },
+  ];
+  return (
+    <section className="rounded border-2 border-ink bg-paper-2 p-4 shadow-press">
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-display text-lg">Theme</h2>
+        <span className="font-condensed text-[10px] uppercase tracking-wider text-sepia">
+          Currently: {effective}
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-sepia">
+        Switch between light and dark, or follow your OS automatically.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {options.map((o) => {
+          const active = theme === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setTheme(o.value)}
+              aria-pressed={active}
+              className={`rounded border-2 p-3 text-left transition-transform ${
+                active
+                  ? "border-red bg-red text-paper shadow-press"
+                  : "border-ink bg-paper text-ink shadow-press-sm hover:translate-x-px hover:translate-y-px hover:shadow-none"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span aria-hidden className="text-lg leading-none">
+                  {o.icon}
+                </span>
+                <span className="font-display text-lg leading-none">
+                  {o.label}
+                </span>
+              </div>
+              <div
+                className={`mt-1 text-xs ${active ? "text-paper-3" : "text-sepia"}`}
+              >
+                {o.sub}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

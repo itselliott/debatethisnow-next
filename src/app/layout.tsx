@@ -43,7 +43,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#faf7f0",
+  // Per-color-scheme theme colors so iOS Safari's URL bar tints to
+  // match whichever theme is active.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#faf7f0" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1814" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -178,6 +183,19 @@ export default function RootLayout({
       className={`${bevan.variable} ${oswald.variable} ${lora.variable} ${specialElite.variable} h-full antialiased`}
     >
       <head>
+        {/* No-flash theme bootstrap. Runs SYNCHRONOUSLY before the body
+            paints so the data-theme attribute is set before any CSS
+            kicks in. Without this, a dark-mode user sees a flash of
+            light theme on every navigation while React hydrates. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('debatethis.theme');" +
+              "var d=t==='dark'||((!t||t==='auto')&&window.matchMedia('(prefers-color-scheme: dark)').matches);" +
+              "document.documentElement.setAttribute('data-theme',d?'dark':'light');" +
+              "}catch(e){}})();",
+          }}
+        />
         {/* Site-wide JSON-LD. WebSite + Organization on every page so
             Google can resolve the entity consistently across the corpus. */}
         <script

@@ -32,6 +32,16 @@
   --color-navy: #182846;
   --color-green-action: #4a7c3a;
 
+  /* Letterpress-shadow color. Decoupled from `--color-ink` because
+   * in dark mode the text becomes light but the shadow needs to stay
+   * dark for contrast. */
+  --color-shadow: #182846;
+  /* Halftone-dot overlay color + blend mode for the body::before
+   * texture. Inverted in dark mode so the dotted noise stays visible
+   * against the darker background. */
+  --halftone-color: rgba(24, 40, 70, 0.035);
+  --halftone-blend: multiply;
+
   /* Semantic aliases used in main.css */
   --color-bg: var(--color-paper);
   --color-text: var(--color-ink);
@@ -47,6 +57,47 @@
  * Base styles + halftone-overlay decoration. Mirrors the body::before
  * trick from main.css that adds the aged-paper texture site-wide.
  */
+/*
+ * Dark theme — activated by setting `data-theme="dark"` on the <html>
+ * element (via `useTheme` hook). All values override the @theme
+ * defaults; Tailwind utilities re-resolve their computed colors
+ * automatically because they reference these CSS variables.
+ *
+ * Palette philosophy: warm dark instead of cold-blue dark — the
+ * paper-equivalent goes to a deep brown-black so the light/dark
+ * versions feel like the same product viewed in different lighting,
+ * not two unrelated themes.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Paper inverts to dark warm brown-black */
+  --color-paper: #1a1814;
+  --color-paper-2: #221f1a;
+  --color-paper-3: #2d2920;
+  --color-paper-4: #3a3528;
+  /* Text inverts to warm cream */
+  --color-ink: #f0ead8;
+  --color-ink-soft: #d8d2bd;
+  --color-sepia: #b8a880;
+  --color-muted-ink: #9a8c66;
+  /* Accents stay vivid but a touch brighter to compensate for dark
+   * surrounding. Brand identity preserved. */
+  --color-red: #e85a60;
+  --color-red-dark: #c4282e;
+  --color-gold: #e8b833;
+  --color-gold-dark: #c49918;
+  /* Sidebar navy → even darker than paper so it still differentiates */
+  --color-navy: #0e1525;
+  --color-green-action: #5fa84a;
+  /* Shadows stay near-black for proper contrast against dark paper */
+  --color-shadow: #000;
+  /* Halftone inverted — light dots on dark instead of dark on light.
+   * Blend mode flips to `screen` so the dots add light rather than
+   * subtract it. */
+  --halftone-color: rgba(240, 234, 216, 0.04);
+  --halftone-blend: screen;
+}
+
 @layer base {
   :root {
     color-scheme: light;
@@ -80,12 +131,12 @@
     content: "";
     position: fixed;
     inset: 0;
-    /* Subtler halftone — was rgba(... 0.07); too heavy against the
-     * old yellow paper and even heavier against the new off-white.
-     * 0.035 reads as paper grain rather than dotted overlay. */
-    background-image: radial-gradient(rgba(24, 40, 70, 0.035) 1px, transparent 1px);
+    /* Halftone overlay — color + blend mode driven by CSS variables
+     * so dark mode flips both automatically (dark dots × multiply on
+     * light paper / light dots × screen on dark paper). */
+    background-image: radial-gradient(var(--halftone-color) 1px, transparent 1px);
     background-size: 14px 14px;
-    mix-blend-mode: multiply;
+    mix-blend-mode: var(--halftone-blend);
     pointer-events: none;
     z-index: 0;
   }
@@ -151,14 +202,17 @@
  * components stay declarative.
  */
 @layer utilities {
+  /* Letterpress utilities — use `--color-shadow` so dark mode can
+   * keep shadows near-black even when the foreground ink colour
+   * inverts to cream. */
   .shadow-press {
-    box-shadow: 4px 4px 0 var(--color-ink);
+    box-shadow: 4px 4px 0 var(--color-shadow);
   }
   .shadow-press-sm {
-    box-shadow: 2px 2px 0 var(--color-ink);
+    box-shadow: 2px 2px 0 var(--color-shadow);
   }
   .shadow-press-lg {
-    box-shadow: 8px 8px 0 var(--color-ink);
+    box-shadow: 8px 8px 0 var(--color-shadow);
   }
 
   /* Decorative top stripe (candy stripe) — used on panels + modal tops. */

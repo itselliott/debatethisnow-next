@@ -20,6 +20,9 @@ import { useSoundToggle } from "@/lib/hooks/use-sound";
 import { useTone } from "@/lib/hooks/use-tone";
 import type { PhraseKey } from "@/lib/tone/phrases";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { ThemeToggleButton } from "@/components/ThemeToggleButton";
+import { displayAvatar } from "@/lib/avatars";
+import { tierColor } from "@/lib/tiers";
 
 interface NavLink {
   href: string;
@@ -164,21 +167,55 @@ function SidebarFooter() {
               Log In
             </Link>
           </div>
-          <SoundToggleButton />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <span className="truncate font-condensed uppercase tracking-wider text-paper-3">
-            {me.data?.username ?? "—"}
-          </span>
-          <span className="text-xs text-paper-3">
-            {me.data
-              ? `${t("elo_label")} ${me.data.elo_rating} · ${me.data.rank_tier ?? ""}`
-              : "—"}
-          </span>
           <div className="flex gap-2">
             <SoundToggleButton />
-            <LogoutButton />
+            <ThemeToggleButton />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {/* User card: avatar + (truncated username over score chip).
+              Tighter than the previous stacked layout — same vertical
+              real estate, less visually wonky. */}
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-ink-soft bg-ink-soft text-lg"
+            >
+              {displayAvatar(me.data?.avatar ?? null, me.data?.username ?? "you")}
+            </span>
+            <div className="min-w-0 flex-1">
+              <Link
+                href={`/profile/${me.data?.id ?? ""}`}
+                className="block truncate font-condensed text-sm uppercase tracking-wider text-paper hover:text-gold"
+              >
+                {me.data?.username ?? "—"}
+              </Link>
+              {me.data ? (
+                <div className="text-[11px] text-paper-3">
+                  <span>{t("elo_label")} {me.data.elo_rating}</span>
+                  {me.data.rank_tier ? (
+                    <>
+                      {" · "}
+                      <span
+                        className="font-condensed uppercase tracking-wider"
+                        style={{ color: tierColor(me.data.rank_tier) }}
+                      >
+                        {me.data.rank_tier}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {/* Utility row: sound · theme · log out. Equal-width so
+              everything lines up cleanly instead of buttons of
+              different lengths. */}
+          <div className="grid grid-cols-3 gap-1.5">
+            <SoundToggleButton compact />
+            <ThemeToggleButton />
+            <LogoutButton compact />
           </div>
         </div>
       )}
@@ -195,7 +232,7 @@ function SidebarFooter() {
   );
 }
 
-function SoundToggleButton() {
+function SoundToggleButton({ compact = false }: { compact?: boolean }) {
   const { muted, toggle } = useSoundToggle();
   const { t } = useTone();
   return (
@@ -203,20 +240,19 @@ function SoundToggleButton() {
       type="button"
       onClick={toggle}
       aria-pressed={!muted}
-      title={
-        muted
-          ? "Sound is off — click to turn on"
-          : "Sound is on — click to mute"
-      }
-      className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
+      aria-label={muted ? "Turn sound on" : "Turn sound off"}
+      title={muted ? "Sound off" : "Sound on"}
+      className="inline-flex items-center justify-center gap-1 rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-ink-soft"
     >
-      <span aria-hidden>♪</span>{" "}
-      {muted ? t("sidebar_sound_off") : t("sidebar_sound_on")}
+      <span aria-hidden>{muted ? "♪̸" : "♪"}</span>
+      {!compact ? (
+        <span>{muted ? t("sidebar_sound_off") : t("sidebar_sound_on")}</span>
+      ) : null}
     </button>
   );
 }
 
-function LogoutButton() {
+function LogoutButton({ compact = false }: { compact?: boolean }) {
   const { t } = useTone();
   const handleLogout = useCallback(async () => {
     const csrf = document.cookie
@@ -241,9 +277,12 @@ function LogoutButton() {
     <button
       type="button"
       onClick={handleLogout}
-      className="rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-red hover:text-paper"
+      aria-label={t("sidebar_log_out")}
+      title={t("sidebar_log_out")}
+      className="inline-flex items-center justify-center gap-1 rounded border border-ink-soft px-2 py-1 font-condensed text-[11px] uppercase tracking-wider hover:bg-red hover:text-paper"
     >
-      {t("sidebar_log_out")}
+      <span aria-hidden>⏻</span>
+      {!compact ? <span>{t("sidebar_log_out")}</span> : null}
     </button>
   );
 }

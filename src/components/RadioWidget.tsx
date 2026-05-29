@@ -31,19 +31,25 @@ interface NprStation {
   url: string;
 }
 
-// Curated NPR affiliates across major US metros. All are confirmed
-// MP3/AAC direct streams that work in plain HTML5 audio. We pick one
-// anchor station per metro that has a stable URL; commercial NPR
-// affiliates with rotating CDN endpoints are skipped.
+// Curated NPR affiliates that run their OWN ICEcast servers without
+// token auth. These three are the only major-metro public radio
+// stations we can rely on long-term:
+//
+//   - WBEZ, WNYC — broadcaster-owned anonymous ICEcast
+//   - WFMT — uses StreamGuys but with no auth layer
+//
+// Other major affiliates (KCRW, WAMU, KQED, WHYY, KUT, NPR News Now)
+// route through third-party CDNs that have been incrementally moving
+// behind token-based auth since 2024. A plain `<audio>` element can't
+// do the token handshake, so those URLs return 403 to anonymous
+// fetches even though the stations are clearly broadcasting on their
+// own sites. We deliberately keep them OFF this list rather than ship
+// presets that intermittently 403 — a short list of working stations
+// reads as polish; a long list with broken buttons reads as bugs.
 const STATIONS: NprStation[] = [
-  { city: "Chicago",       call: "WBEZ", freq: "91.5", url: "https://stream.wbez.org/wbez128.mp3" },
-  { city: "New York",      call: "WNYC", freq: "93.9", url: "https://fm939.wnyc.org/wnycfm" },
-  { city: "Los Angeles",   call: "KCRW", freq: "89.9", url: "https://kcrw.streamguys1.com/kcrw_128k_mp3_internet" },
-  { city: "Washington DC", call: "WAMU", freq: "88.5", url: "https://wamu-1.streamguys1.com/wamu-128k.mp3" },
-  { city: "San Francisco", call: "KQED", freq: "88.5", url: "https://streams.kqed.org/kqedradio" },
-  { city: "Philadelphia",  call: "WHYY", freq: "90.9", url: "https://wm-live.streamguys1.com/whyymp3-c" },
-  { city: "Austin",        call: "KUT",  freq: "90.5", url: "https://kut.streamguys1.com/kut-aac" },
-  { city: "National",      call: "NPR",  freq: "Now",  url: "https://npr-ice.streamguys1.com/live.mp3" },
+  { city: "Chicago",  call: "WBEZ", freq: "91.5", url: "https://stream.wbez.org/wbez128.mp3" },
+  { city: "New York", call: "WNYC", freq: "93.9", url: "https://fm939.wnyc.org/wnycfm" },
+  { city: "Chicago",  call: "WFMT", freq: "98.7", url: "https://wfmt-ice.streamguys1.com/wfmt-aac" },
 ];
 
 const KEY_STATION_INDEX = "debatethis.radio.stationIndex";
@@ -140,13 +146,54 @@ export function RadioWidget() {
   // Render via portal at <body> so the chip stays pinned to the
   // viewport regardless of any ancestor's transform/filter context.
   const [mounted, setMounted] = useState(false);
+  const nodeRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Anchor the chip to the visual viewport (the actually-visible
+  // region, including pinch-zoom offset). `position: fixed` alone
+  // pins to the LAYOUT viewport, which differs from the visual
+  // viewport when zoomed — making the chip appear to scroll along
+  // with the page as the user pans the zoomed view. Manually
+  // updating its position on every visualViewport event keeps it
+  // tied to "the top-right of what you're looking at", which is
+  // what the user expects.
+  useEffect(() => {
+    if (!mounted) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const el = nodeRef.current;
+      if (!el) return;
+      // offsetTop/offsetLeft are non-zero when the user has zoomed
+      // and panned; on an un-zoomed page they're 0 and behaviour
+      // matches the plain `position: fixed` default.
+      el.style.top = `${vv.offsetTop + 12}px`;
+      el.style.left = `${vv.offsetLeft + vv.width - el.offsetWidth - 12}px`;
+      el.style.right = "auto";
+    };
+    update();
+    vv.addEventListener("scroll", update);
+    vv.addEventListener("resize", update);
+    // Re-position whenever window dimensions or our own size change
+    // (e.g. collapsed↔expanded toggles the chip width).
+    const ro = new ResizeObserver(update);
+    if (nodeRef.current) ro.observe(nodeRef.current);
+    window.addEventListener("resize", update);
+    return () => {
+      vv.removeEventListener("scroll", update);
+      vv.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
+      ro.disconnect();
+    };
+  }, [mounted, expanded]);
+
   if (!mounted) return null;
 
   const node = (
     <div
+      ref={nodeRef}
       style={{ position: "fixed", top: 12, right: 12, zIndex: 50 }}
       className="hidden md:block"
     >

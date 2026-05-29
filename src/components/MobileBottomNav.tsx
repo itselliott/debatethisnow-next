@@ -16,6 +16,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTone } from "@/lib/hooks/use-tone";
 import type { PhraseKey } from "@/lib/tone/phrases";
+import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 
 interface Tab {
   href: string;
@@ -142,6 +143,15 @@ function MoreSheet({
             );
           })}
         </ul>
+        {/* Quick theme toggle — mirrors the sidebar's button so mobile
+            users have the same one-tap dark/light flip without going
+            into Settings. */}
+        <div className="mt-3 flex justify-center">
+          <ThemeToggleButton
+            label
+            className="bg-paper text-ink hover:bg-ink hover:text-paper"
+          />
+        </div>
         <button
           type="button"
           onClick={onClose}
