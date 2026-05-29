@@ -1,6 +1,6 @@
 ---
-title: 100+ Debate Topics for 2026 (For Every Skill Level)
-description: A curated list of debate topics — from icebreakers and beginner prompts to advanced policy and philosophy resolutions — organized by difficulty and category. Built for clubs, classrooms, and solo practice.
+title: 300+ Debate Topics for 2026 (For Every Skill Level)
+description: A curated list of debate topics — from icebreakers and beginner prompts to advanced policy and philosophy resolutions — organized by difficulty and category. Built for clubs, classrooms, and solo practice. Browse the full searchable catalog at /topics.
 date: 2026-05-19
 tags: [debate-topics, beginner, classroom]
 ---

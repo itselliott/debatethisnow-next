@@ -70,7 +70,7 @@ The newest option, and the most accessible.
 
 ### DebateThis (free)
 
-DebateThis lets you run real-time debate rounds against AI opponents calibrated to your Elo. The platform's house bots are tiered (Bronze to Gold) and use different personalities (formal, aggressive, thoughtful, snarky), so you're never just playing the same opponent.
+DebateThis lets you run real-time debate rounds against AI opponents calibrated to your Elo. Tiers run Bronze through Senator, and the house bots each pair a distinct personality (formal, aggressive, thoughtful, snarky) with a different LLM brain (Claude, Gemini, Groq, Mistral, Cerebras), so you're never just playing the same opponent twice. Clubs running virtual sessions can also use the [no-account challenge flow](/play) — coach drops a link, two students click, debate starts, no member-account paperwork on the front end.
 
 What you can do on DebateThis:
 

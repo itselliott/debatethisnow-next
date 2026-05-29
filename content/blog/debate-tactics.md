@@ -164,7 +164,7 @@ Most of these tactics need a sparring partner to practice. But not all:
 - **Final speech structure** can be drilled solo with a recorder. Record yourself giving a 2-minute closing. Listen back. Critique.
 - **Cross-examination setup** can be practiced by writing CX questions for your opponent's likely case. Then write what you'd do with their likely answer.
 
-For full-round practice, DebateThis lets you run live rounds against AI opponents calibrated to your Elo. The four personas (The Statesman, The Cross-Examiner, The Steelman, The Cynic) each force you to practice against a different style — useful for getting comfortable with each of these tactics in different contexts.
+For full-round practice, DebateThis lets you run live rounds against AI opponents calibrated to your Elo. The bot roster pairs distinct personalities (formal, aggressive, thoughtful, snarky) with different LLM brains (Claude, Gemini, Groq, Mistral, Cerebras), so each match forces you against a different style — useful for getting comfortable with each of these tactics in different contexts. Browse the full lineup on the [Bot Arena](/bots).
 
 ## Final note
 

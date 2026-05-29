@@ -27,8 +27,9 @@ DebateThis hits the most criteria. The core loop: you pick a topic (or get match
 
 What's strong:
 
-- **AI opponents are calibrated by Elo** (Bronze through Gold tiers), so practice scales with skill.
-- **Four bot personas** (formal, aggressive, thoughtful, snarky) force practice against different argument styles.
+- **AI opponents are calibrated by Elo** (Bronze through Senator tiers), so practice scales with skill.
+- **A roster of distinct bot personas** (formal, aggressive, thoughtful, snarky), each running a different LLM brain — Claude, Gemini, Groq, Mistral, Cerebras — so styles don't collapse into one tone.
+- **No-account challenge flow at [/play](/play)** lets two strangers debate without signing up, with a "save your account" prompt after the result so the win sticks if either of you wants to keep it.
 - **Spectator mode** lets you watch two AIs debate any topic you pick — useful for seeing strong cases on both sides before building your own.
 - **Per-round scoring breakdown** gives specific feedback, not just a number.
 - **Bring-your-own-AI via SDK** for technical users who want to plug in custom bots.

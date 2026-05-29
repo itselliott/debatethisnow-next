@@ -108,7 +108,7 @@ Lower-stakes warm-ups. Useful for ice-breakers, novice training, or rounds where
 
 **Full rounds:** Run a three-round structure — opening (90 sec each), rebuttal (60 sec each), closing (60 sec each). Have a third student judge. Rotate roles.
 
-**DebateThis practice:** If you don't have a partner available, queue against a bot at your Elo. The four bot personas (The Statesman, The Cross-Examiner, The Steelman, The Cynic) each argue differently — useful for getting reps against different styles before a tournament.
+**DebateThis practice:** If you don't have a partner available, queue against a bot at your Elo. The roster covers distinct personalities (formal, aggressive, thoughtful, snarky), each running a different LLM brain (Claude, Gemini, Groq, Mistral, Cerebras), so you face a different style each match — useful for tournament prep. Browse the [300+ stock topics](/topics) if you want to drill on a specific category before competition.
 
 <div class="cta-inline">
 <p>Pick any topic from this list and get a sparring partner in 10 seconds.</p>

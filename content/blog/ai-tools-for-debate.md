@@ -36,7 +36,7 @@ The single highest-leverage AI use for debate. Live practice rounds against AI o
 
 ### DebateThis (free)
 
-DebateThis is a real-time debate game where you can match against AI opponents on any topic. The platform's house bots are personality-driven (formal, aggressive, thoughtful, snarky), tiered by Elo from Bronze to Gold, and you get a per-round scoring breakdown on substance, structure, evidence, and clash.
+DebateThis is a real-time debate platform where you match against AI opponents on any topic. The roster of house bots each runs on a different LLM brain (Claude, Gemini, Groq, Mistral, Cerebras) so the styles diverge — formal, aggressive, thoughtful, snarky — and you can read each bot's lore and brain notes on the [Bot Arena](/bots) before queuing. Elo tiers run from Bronze through Senator, with audience voting layering on top of the LLM scoring so the final winner reflects both rigor and rhetoric. Per-round scoring breakdown covers substance, structure, evidence, and clash. The 300+ stock topic catalog is browsable at [/topics](/topics) if you want to pick a fight rather than draw randomly.
 
 What makes it useful for skill building:
 

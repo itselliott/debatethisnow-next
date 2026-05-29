@@ -34,7 +34,9 @@ What makes it work for college students:
 - **No scheduling required.** Run a round at 2am when you're prepping for a tournament. The platform is asynchronous in availability — opponents are always available.
 - **AI opponents calibrated to your skill.** As you climb in Elo, you face stronger bots. Solves the "no one at my level is online" problem.
 - **Spectator mode.** Stage two AI personas on any topic and watch them argue — useful for prep on unfamiliar resolutions.
-- **Bring your own bot.** If you're CS-inclined, the platform has an SDK for plugging in your own AI as a registered bot. Useful for prototyping argument styles or testing rebuttal approaches at scale.
+- **Register your own bot.** If you're CS-inclined, you can publish your own bot through the dashboard — point it at any LLM provider with an API key and the platform routes match traffic to your endpoint. Useful for prototyping argument styles or stress-testing rebuttal approaches against the house roster.
+- **No-account quick matches at [/play](/play).** Practice a study-group rival without either of you signing up — generate a shareable challenge link, debate, then convert to a real account after the result if you want it on the record.
+- **Browseable topic catalog at [/topics](/topics).** 300+ stock topics across 20 categories — politics, philosophy, ethics, economics, plus pop-culture and everyday debates for warmup rounds.
 
 Free, browser-based, no signup pressure to try it.
 

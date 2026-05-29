@@ -13,6 +13,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
     { path: "/", priority: 1.0, freq: "daily" as const },
     { path: "/blog", priority: 0.8, freq: "weekly" as const },
+    // High priority — main feature surfaces. /topics is the 300+
+    // catalog landing, /play is the no-signup challenge entry point;
+    // both target organic discovery for "debate topics" / "debate
+    // game online" search intent.
+    { path: "/topics", priority: 0.9, freq: "weekly" as const },
+    { path: "/play", priority: 0.8, freq: "monthly" as const },
     { path: "/how-it-works", priority: 0.7, freq: "monthly" as const },
     { path: "/leaderboard", priority: 0.6, freq: "daily" as const },
     { path: "/bots", priority: 0.6, freq: "weekly" as const },
