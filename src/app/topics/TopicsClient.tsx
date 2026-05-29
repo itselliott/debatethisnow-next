@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useTone } from "@/lib/hooks/use-tone";
+import { useTrendingTopics } from "@/lib/hooks/use-dashboard";
 
 type SortMode = "alpha" | "category" | "shuffle";
 
@@ -81,6 +82,7 @@ export function TopicsClient({
   const topics = search.data?.topics ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  void initialTotal;
   return (
     <div className="space-y-6">
       <header className="border-b-[3px] border-double border-ink pb-4">
@@ -88,12 +90,14 @@ export function TopicsClient({
           Catalog
         </span>
         <h1 className="mt-1 font-display text-3xl">{t("nav_topics")}</h1>
-        <p className="text-sm text-sepia">
-          {initialTotal} stock topics across {initialCategories.length}{" "}
-          categories. Search, filter, and queue any of them into
-          matchmaking. Past topics from real debates coming soon.
-        </p>
       </header>
+
+      {/* Trending Topics panel — same component the dashboard renders,
+       * pulled in via the shared TanStack Query hook so the home page
+       * and /topics never disagree on what's trending today. Sits
+       * above the search box so a returning user sees today's rotation
+       * before they decide whether to dig through the full catalog. */}
+      <TrendingPanel />
 
       <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
@@ -201,30 +205,60 @@ function TopicCard({ topic }: { topic: TopicRow }) {
   const params = new URLSearchParams();
   params.set("topic", topic.topic);
   params.set("category", topic.category);
+  // Whole card is the queue link — no separate button. Matches the
+  // dashboard's trending-topics card density and keeps the grid
+  // scanable when 50 per page are on screen.
   return (
-    <article className="rounded border border-ink bg-paper-2 p-4 shadow-press-sm">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-condensed text-[10px] uppercase tracking-[0.28em] text-red">
-          {topic.category}
-        </span>
-        {topic.tags && topic.tags.length > 0 ? (
-          <span className="truncate font-condensed text-[10px] uppercase tracking-wider text-sepia">
-            {topic.tags.slice(0, 3).join(" · ")}
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-2 font-display text-base leading-snug text-ink">
+    <Link
+      href={`/matchmaking?${params.toString()}`}
+      className="block rounded border border-ink bg-paper-2 p-3 text-sm shadow-press-sm transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
+    >
+      <span className="font-condensed text-xs uppercase tracking-wider text-red">
+        {topic.category}
+      </span>
+      <div className="mt-1 font-body leading-snug text-ink">
         {topic.topic}
-      </p>
-      <div className="mt-3 flex gap-2">
-        <Link
-          href={`/matchmaking?${params.toString()}`}
-          className="flex-1 rounded bg-red px-3 py-2 text-center font-condensed text-xs uppercase tracking-widest text-paper shadow-press-sm hover:opacity-90"
-        >
-          Queue Up ▸
-        </Link>
       </div>
-    </article>
+    </Link>
+  );
+}
+
+/**
+ * Trending Topics — identical look + data source to the dashboard
+ * panel. Pulls 10 topics from /api/debates/trending (rotated daily
+ * by a UTC-date seed inside the matchmaking service).
+ */
+function TrendingPanel() {
+  const trending = useTrendingTopics();
+  const topics = trending.data?.topics ?? [];
+  return (
+    <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="font-display text-lg">Trending Topics</h2>
+        <span className="font-condensed text-[10px] uppercase tracking-wider text-sepia">
+          Rotates daily
+        </span>
+      </div>
+      {trending.isLoading ? (
+        <p className="text-sm text-sepia">Loading…</p>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {topics.map((tp) => (
+            <li key={tp.topic}>
+              <Link
+                href={`/matchmaking?topic=${encodeURIComponent(tp.topic)}&category=${encodeURIComponent(tp.category)}`}
+                className="block rounded border border-ink bg-paper p-3 text-sm shadow-press-sm transition-transform hover:translate-x-px hover:translate-y-px hover:shadow-none"
+              >
+                <span className="font-condensed text-xs uppercase tracking-wider text-red">
+                  {tp.category}
+                </span>
+                <div className="mt-1 font-body text-ink">{tp.topic}</div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
