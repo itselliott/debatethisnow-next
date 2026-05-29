@@ -31,8 +31,40 @@ import { notify } from "@/lib/services/notification-service";
 import { countWords } from "@/lib/utils/word-count";
 import { rankTierForElo } from "@/lib/services/rank-service";
 
+// Default (competitive) word floor. Casual mode loosens this — see
+// `argumentRules`.
 export const MIN_ARGUMENT_WORDS = 15;
 
+/**
+ * Ruleset for a single argument, derived from the debate's `mode`.
+ * Casual mode lowers the entry bar (shorter floor, lower ceiling)
+ * so the format reads like "text my friend an opinion" rather than
+ * "deliver a varsity-debate opening". Competitive uses the env-
+ * configured defaults — full debate-club rules.
+ *
+ * Pass the debate's mode (or just the string "casual"/"competitive")
+ * — anything not "casual" falls through to competitive defaults.
+ */
+export function argumentRules(modeOrDebate: { mode?: string | null } | string | null | undefined): {
+  minWords: number;
+  maxWords: number;
+  maxBytes: number;
+} {
+  const mode =
+    typeof modeOrDebate === "string"
+      ? modeOrDebate
+      : modeOrDebate?.mode ?? "competitive";
+  if (mode === "casual") {
+    return { minWords: 10, maxWords: 400, maxBytes: 4000 };
+  }
+  return {
+    minWords: MIN_ARGUMENT_WORDS,
+    maxWords: env.MAX_ARGUMENT_WORDS,
+    maxBytes: env.MAX_ARGUMENT_BYTES,
+  };
+}
+
+/** @deprecated Use `argumentRules(debate)` for mode-aware caps. */
 export function argumentCaps(): { maxWords: number; maxBytes: number } {
   return {
     maxWords: env.MAX_ARGUMENT_WORDS,
@@ -65,11 +97,18 @@ interface DurationConfig {
 function durationsFor(debate: DebateWithPlayers): DurationConfig {
   const p1Bot = isBot(debate.player1);
   const p2Bot = isBot(debate.player2);
-  const cfg: Record<number, number> = {
-    1: env.ROUND_OPENING_SECONDS,
-    2: env.ROUND_REBUTTAL_SECONDS,
-    3: env.ROUND_CLOSING_SECONDS,
-  };
+  // Casual mode shrinks turns to the under-3-min range so the debate
+  // feels like a back-and-forth text exchange instead of a formal
+  // event. Competitive mode keeps the configured per-round seconds
+  // (defaults: 5min opening / 3min rebuttal / 3min closing).
+  const isCasual = debate.mode === "casual";
+  const cfg: Record<number, number> = isCasual
+    ? { 1: 180, 2: 120, 3: 120 }
+    : {
+        1: env.ROUND_OPENING_SECONDS,
+        2: env.ROUND_REBUTTAL_SECONDS,
+        3: env.ROUND_CLOSING_SECONDS,
+      };
   if (p1Bot && p2Bot) {
     // Showcase — no timer. Bots act on current_turn_user_id, not a clock.
     return { durations: null, prepSeconds: 0 };
@@ -78,7 +117,10 @@ function durationsFor(debate: DebateWithPlayers): DurationConfig {
     // Effectively unlimited for the human; bots submit in <30s anyway.
     return { durations: { 1: 3600, 2: 3600, 3: 3600 }, prepSeconds: 3 };
   }
-  return { durations: cfg, prepSeconds: env.PREP_SECONDS };
+  return {
+    durations: cfg,
+    prepSeconds: isCasual ? 15 : env.PREP_SECONDS,
+  };
 }
 
 export function isShowcaseDebate(
@@ -385,6 +427,7 @@ export async function submitArgument(
       current_turn_user_id: true,
       current_round: true,
       phase: true,
+      mode: true,
     },
   });
   if (!debate) return null;
@@ -393,8 +436,8 @@ export async function submitArgument(
   const trimmed = (content ?? "").trim();
   if (!trimmed) return null;
   const wc = countWords(trimmed);
-  if (wc < MIN_ARGUMENT_WORDS) return null;
-  const { maxWords, maxBytes } = argumentCaps();
+  const { minWords, maxWords, maxBytes } = argumentRules(debate);
+  if (wc < minWords) return null;
   if (wc > maxWords) return null;
   if (Buffer.byteLength(trimmed, "utf8") > maxBytes) return null;
   return prisma.debateMessage.create({

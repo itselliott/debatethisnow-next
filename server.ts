@@ -24,6 +24,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { validateProdEnv } from "./src/lib/env";
 import { seedCatalog } from "./src/lib/services/achievement-service";
 import {
+  backfillBotAvatars,
   brainStatus,
   releaseStuckHouseBots,
   seedMissingHouseBots,
@@ -88,6 +89,14 @@ async function runStartupHooks(): Promise<void> {
     }],
     // Seed the canonical 8 house bots if any are missing.
     ["seed-house-bots", () => seedMissingHouseBots()],
+    // Backfill avatars on any house bots that pre-date the lore
+    // catalog (they were created with the generic "bot" marker).
+    ["backfill-bot-avatars", async () => {
+      const n = await backfillBotAvatars();
+      if (n > 0) {
+        console.log(`[startup] backfilled avatar for ${n} house bot(s)`);
+      }
+    }],
     // Free bots stuck at 'in_debate' that aren't actually mid-debate.
     ["release-stuck-bots", () => releaseStuckHouseBots()],
     // Achievement catalog (idempotent).

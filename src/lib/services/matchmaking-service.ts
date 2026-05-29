@@ -185,6 +185,9 @@ export async function createDebateForPair(
   b: Pick<User, "id">,
   topic?: string | null,
   category?: string | null,
+  // Casual / competitive ruleset. Defaults to competitive when the
+  // caller doesn't pass it — matches existing behaviour.
+  mode: "competitive" | "casual" = "competitive",
 ): Promise<Debate | null> {
   if ((await hasActiveDebate(a.id)) || (await hasActiveDebate(b.id))) {
     return null;
@@ -208,6 +211,7 @@ export async function createDebateForPair(
       data: {
         topic: chosenTopic!,
         category: chosenCategory ?? "Society",
+        mode,
         status: "live",
         phase: "opening",
         player1_id: p1.id,

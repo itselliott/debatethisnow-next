@@ -112,6 +112,51 @@ export function NotificationCenter() {
     [qc],
   );
 
+  // Interpret the structured error responses from the challenge
+  // accept / decline endpoints so we can a) show a human-readable
+  // message and b) know whether the challenge is permanently dead
+  // (already resolved / expired / 404) — when dead, we keep the
+  // optimistic remove and refresh the notification list so the stale
+  // row goes away for good.
+  interface ResolvedError {
+    message: string;
+    dead: boolean;
+    debateId: number | null;
+  }
+  const interpretChallengeError = (err: unknown): ResolvedError => {
+    if (err instanceof ApiError) {
+      const data = err.data as {
+        message?: string;
+        error?: string;
+        status?: string;
+        debate_id?: number | null;
+      } | null;
+      const dead =
+        err.status === 404 ||
+        data?.error === "expired" ||
+        data?.error === "already_resolved" ||
+        data?.error === "not_found";
+      return {
+        message:
+          data?.message ??
+          (data?.error === "expired"
+            ? "This challenge has expired."
+            : data?.error === "already_resolved"
+              ? "This challenge was already resolved."
+              : err.message) ??
+          "Something went wrong.",
+        dead,
+        debateId:
+          typeof data?.debate_id === "number" ? data.debate_id : null,
+      };
+    }
+    return {
+      message: "Couldn't reach the server. Try again.",
+      dead: false,
+      debateId: null,
+    };
+  };
+
   const acceptChallenge = useCallback(
     async (n: NotificationDict, challengeId: number) => {
       setActingOn(n.id);
@@ -121,21 +166,28 @@ export function NotificationCenter() {
         const res = await apiClient.post<{ debate_id: number }>(
           `/api/challenges/${challengeId}/accept`,
         );
-        // Background refresh of the dashboard inbox cache so the
-        // ChallengesCard there is consistent too.
         void qc.invalidateQueries({
           queryKey: ["dashboard", "challenges-inbox"],
         });
         setOpen(false);
         router.push(`/debate/${res.debate_id}`);
       } catch (err) {
-        // Roll back the optimistic remove.
-        for (const [k, v] of snapshots) qc.setQueryData(k, v);
-        setActionError(
-          err instanceof ApiError
-            ? ((err.data as { message?: string } | null)?.message ?? err.message)
-            : "Couldn't accept the challenge.",
-        );
+        const { message, dead, debateId } = interpretChallengeError(err);
+        if (dead) {
+          // Stay optimistic — the row was already removed, leave it
+          // gone since it can't be accepted anyway. If the server told
+          // us it was already accepted AND included the debate id,
+          // just jump straight to the live room.
+          setActionError(message);
+          void qc.invalidateQueries({ queryKey: ["notifications"] });
+          if (debateId !== null) {
+            setOpen(false);
+            router.push(`/debate/${debateId}`);
+          }
+        } else {
+          for (const [k, v] of snapshots) qc.setQueryData(k, v);
+          setActionError(message);
+        }
       } finally {
         setActingOn(null);
       }
@@ -154,12 +206,14 @@ export function NotificationCenter() {
           queryKey: ["dashboard", "challenges-inbox"],
         });
       } catch (err) {
-        for (const [k, v] of snapshots) qc.setQueryData(k, v);
-        setActionError(
-          err instanceof ApiError
-            ? ((err.data as { message?: string } | null)?.message ?? err.message)
-            : "Couldn't decline the challenge.",
-        );
+        const { message, dead } = interpretChallengeError(err);
+        if (dead) {
+          setActionError(message);
+          void qc.invalidateQueries({ queryKey: ["notifications"] });
+        } else {
+          for (const [k, v] of snapshots) qc.setQueryData(k, v);
+          setActionError(message);
+        }
       } finally {
         setActingOn(null);
       }
@@ -239,21 +293,53 @@ export function NotificationCenter() {
                   n.kind === "challenge_received"
                     ? pickNumber(n.payload, "challenge_id")
                     : null;
-                const showActions = challengeId !== null;
+                // Server enriches challenge_received with a live
+                // status + actionable flag. If the server didn't (old
+                // payload), default to actionable so we don't silently
+                // hide buttons on legacy rows.
+                const challengeActionable =
+                  n.kind === "challenge_received"
+                    ? n.payload?.challenge_actionable !== false
+                    : false;
+                const challengeStatus =
+                  n.kind === "challenge_received"
+                    ? (typeof n.payload?.challenge_status === "string"
+                        ? n.payload.challenge_status
+                        : null)
+                    : null;
+                const challengeDebateId =
+                  n.kind === "challenge_received"
+                    ? pickNumber(n.payload, "challenge_debate_id")
+                    : null;
+                const showActions =
+                  challengeId !== null && challengeActionable;
+                const showStatusFooter =
+                  n.kind === "challenge_received" &&
+                  challengeId !== null &&
+                  !challengeActionable;
                 const acting = actingOn === n.id;
                 return (
                   <li key={n.id} className="border-b border-ink/10">
                     <div
                       className={`flex w-full items-start gap-2 px-3 py-2 transition-colors ${
                         n.read ? "" : "bg-gold/10"
-                      } ${showActions ? "" : "hover:bg-paper-2"}`}
+                      } ${showActions || showStatusFooter ? "" : "hover:bg-paper-2"}`}
                     >
                       <button
                         type="button"
                         onClick={() => {
                           if (acting) return;
-                          if (!showActions) onItemClick(n);
-                          else if (!n.read) markRead.mutate(n.id);
+                          if (showStatusFooter && challengeDebateId !== null) {
+                            // Resolved + accepted → jump to debate or
+                            // results page when clicked.
+                            if (!n.read) markRead.mutate(n.id);
+                            setOpen(false);
+                            router.push(`/debate/${challengeDebateId}`);
+                          } else if (!showActions) {
+                            onItemClick(n);
+                          } else if (!n.read) {
+                            markRead.mutate(n.id);
+                          }
                         }}
                         className="flex flex-1 items-start gap-2 text-left"
                       >
@@ -276,10 +362,8 @@ export function NotificationCenter() {
                       </button>
                     </div>
                     {showActions && challengeId !== null ? (
-                      // Inline accept/decline. Replaces the "navigate
-                      // to dashboard" flow for challenge_received —
-                      // user can act in one click without leaving
-                      // their current page.
+                      // Inline accept/decline — only when the challenge
+                      // is still pending per the server's live status.
                       <div className="flex gap-2 border-t border-ink/10 bg-paper-2 px-3 py-2">
                         <button
                           type="button"
@@ -297,6 +381,26 @@ export function NotificationCenter() {
                         >
                           Decline
                         </button>
+                      </div>
+                    ) : showStatusFooter ? (
+                      // Resolved — no buttons, just a status chip so
+                      // the user knows why they can't act on it.
+                      <div className="flex items-center justify-between border-t border-ink/10 bg-paper-2 px-3 py-1.5 text-[11px]">
+                        <span className="font-condensed uppercase tracking-wider text-sepia">
+                          {challengeStatus === "accepted"
+                            ? "✓ Accepted"
+                            : challengeStatus === "declined"
+                              ? "✗ Declined"
+                              : challengeStatus === "expired"
+                                ? "⌛ Expired"
+                                : challengeStatus ?? "Resolved"}
+                        </span>
+                        {challengeStatus === "accepted" &&
+                        challengeDebateId !== null ? (
+                          <span className="font-condensed uppercase tracking-wider text-red">
+                            Go to debate ▸
+                          </span>
+                        ) : null}
                       </div>
                     ) : null}
                   </li>

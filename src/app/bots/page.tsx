@@ -6,7 +6,12 @@
  */
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { brainMeta, getBrain, isHouseBot } from "@/lib/services/bot-brain";
+import {
+  botLore,
+  brainMeta,
+  getBrain,
+  isHouseBot,
+} from "@/lib/services/bot-brain";
 import { toPublicDict } from "@/lib/serializers/user";
 import { toDebateDict } from "@/lib/serializers/debate";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -45,7 +50,16 @@ export default async function BotsPage() {
       const k = getBrain(u);
       brain = { key: k, ...brainMeta(k) };
     }
-    return { ...base, online_status: onlineStatus, brain };
+    const lore = botLore(u.username);
+    return {
+      ...base,
+      online_status: onlineStatus,
+      brain,
+      avatar: u.avatar ?? null,
+      lore: lore
+        ? { origin: lore.origin, brainStory: lore.brainStory }
+        : null,
+    };
   });
   const liveDebates = liveShowcases.map((d) => toDebateDict(d));
 

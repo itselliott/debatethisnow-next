@@ -106,6 +106,12 @@ model Debate {
   id                    Int       @id @default(autoincrement())
   topic                 String    @db.VarChar(255)
   category              String?   @default("Society") @db.VarChar(64)
+  // "competitive" (full debate-club rules — 5min rounds, 15-word
+  // floor, 800-word ceiling, formal scoring) or "casual" (relaxed —
+  // 2-3min rounds, 10-word floor, 400-word ceiling, looser AI
+  // scoring). Captured from the queueing user's tone preference at
+  // match-creation time so the matched pair plays under one ruleset.
+  mode                  String    @default("competitive") @db.VarChar(16)
   status                String    @default("pending") @db.VarChar(32)
   player1_id            Int?
   player2_id            Int?

@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, ApiError } from "@/lib/api-client";
 import { useLang, useTone } from "@/lib/hooks/use-tone";
+import { useCurrentUser } from "@/lib/hooks/use-current-user";
+import { AVATAR_CATEGORIES, displayAvatar } from "@/lib/avatars";
 import type { Lang } from "@/lib/tone/phrases";
 
 const LANGUAGES: Array<{ code: Lang; label: string; flag: string }> = [
@@ -62,6 +65,8 @@ export function SettingsClient({
         <h1 className="mt-1 font-display text-3xl">Settings</h1>
         <p className="text-sm text-sepia">Signed in as {username}.</p>
       </header>
+
+      <AvatarSection username={username} />
 
       <ToneSection />
 
@@ -179,5 +184,114 @@ function ToneOption({
         {sub}
       </div>
     </button>
+  );
+}
+
+/**
+ * Avatar picker. Renders the current avatar prominently + a grid of
+ * catalog glyphs grouped by category. Click any glyph to pick it;
+ * optimistically updates the cached current-user record so the
+ * sidebar avatar + profile etc. refresh immediately.
+ */
+function AvatarSection({ username }: { username: string }) {
+  const me = useCurrentUser();
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (me.data?.avatar) setSelected(me.data.avatar);
+  }, [me.data?.avatar]);
+
+  const pick = async (glyph: string) => {
+    setErr(null);
+    setSaving(true);
+    const previous = selected;
+    setSelected(glyph);
+    // Optimistic cache update so other surfaces (sidebar, profile)
+    // reflect the change instantly.
+    qc.setQueryData(["auth", "me"], (old: unknown) => {
+      if (!old || typeof old !== "object") return old;
+      return { ...(old as Record<string, unknown>), avatar: glyph };
+    });
+    try {
+      await apiClient.put("/api/users/me/avatar", { avatar: glyph });
+    } catch (e) {
+      setSelected(previous);
+      qc.setQueryData(["auth", "me"], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        return { ...(old as Record<string, unknown>), avatar: previous };
+      });
+      setErr(
+        e instanceof ApiError
+          ? ((e.data as { message?: string } | null)?.message ?? e.message)
+          : "Couldn't save avatar.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const current = selected || displayAvatar(me.data?.avatar ?? null, username);
+
+  return (
+    <section className="rounded border-2 border-ink bg-paper-2 p-4 shadow-press">
+      <div className="flex items-start gap-3">
+        <div
+          aria-hidden
+          className="flex h-16 w-16 items-center justify-center rounded border-2 border-ink bg-paper text-3xl shadow-press-sm"
+        >
+          {current}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-lg">Avatar</h2>
+          <p className="mt-1 text-sm text-sepia">
+            Pick a glyph — it shows up wherever your name appears.
+          </p>
+        </div>
+      </div>
+
+      {err ? (
+        <div
+          role="alert"
+          className="mt-2 rounded border border-red bg-red/10 px-3 py-2 text-sm text-red-dark"
+        >
+          {err}
+        </div>
+      ) : null}
+
+      <div className="mt-3 space-y-3">
+        {AVATAR_CATEGORIES.map((cat) => (
+          <div key={cat.label}>
+            <div className="font-condensed text-[10px] uppercase tracking-wider text-sepia">
+              {cat.label}
+            </div>
+            <div className="mt-1 grid grid-cols-8 gap-1.5 sm:grid-cols-10">
+              {cat.emojis.map((glyph) => {
+                const active = glyph === selected;
+                return (
+                  <button
+                    key={glyph}
+                    type="button"
+                    onClick={() => pick(glyph)}
+                    disabled={saving}
+                    aria-pressed={active}
+                    aria-label={`Set avatar to ${glyph}`}
+                    className={`flex h-9 w-9 items-center justify-center rounded border text-xl transition-transform hover:scale-110 ${
+                      active
+                        ? "border-red bg-red/20 shadow-press-sm"
+                        : "border-ink/30 bg-paper hover:border-ink"
+                    } disabled:opacity-50`}
+                  >
+                    {glyph}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

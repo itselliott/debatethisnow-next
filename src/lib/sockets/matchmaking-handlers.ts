@@ -145,6 +145,10 @@ async function onJoinMatchmaking(
     typeof payload.category === "string" && payload.category.length > 0
       ? payload.category
       : null;
+  // Casual mode is opt-in via the queueing user's tone preference.
+  // Both players see the same mode in the resulting debate.
+  const mode: "competitive" | "casual" =
+    payload.mode === "casual" ? "casual" : "competitive";
 
   if (await hasActiveDebate(user.id)) {
     io.to(userRoom(user.id)).emit("queue_update", {
@@ -175,6 +179,7 @@ async function onJoinMatchmaking(
       opponent,
       chosenTopic,
       chosenCategory,
+      mode,
     );
     if (!debate) return; // race lost
     // DELIBERATELY do NOT call startTurn here. The previous behavior

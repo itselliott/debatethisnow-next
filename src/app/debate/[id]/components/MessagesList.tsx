@@ -70,7 +70,53 @@ function StreamingBubble({
   author: string;
   content: string;
 }) {
+  // Client-side reveal at a natural human pace. Groq emits tokens at
+  // ~50/sec which arrives so quickly the bubble looked like an instant
+  // paste, not like a person typing. We keep a `displayed` substring
+  // that walks toward the server's full `content` at ~12 chars/sec
+  // (~140 wpm — fast confident typist), with natural variation:
+  //
+  //   - 1–3 chars per tick, randomised
+  //   - 35–75ms between non-punctuation ticks
+  //   - 180–280ms pause at punctuation (. ! ? ; , :)
+  //   - 90–140ms pause at word boundaries
+  //
+  // The pace looks alive without being slow — feels human, doesn't
+  // bore the viewer. When `content` resets (new bot turn), we restart
+  // from 0; when streaming finishes, the bubble is replaced by the
+  // persisted `argument_posted` message via the store, so any
+  // not-yet-revealed tail jumps to its final form there.
+  const [displayed, setDisplayed] = useState("");
+
+  // Reset when content shrinks (new turn / new stream).
+  useEffect(() => {
+    if (content.length < displayed.length) setDisplayed("");
+  }, [content, displayed.length]);
+
+  // Advance one tick at a time. Re-runs whenever displayed/content
+  // changes; clears its timeout on unmount or re-run.
+  useEffect(() => {
+    if (displayed.length >= content.length) return;
+    const nextCharIdx = displayed.length;
+    const nextChar = content[nextCharIdx] ?? "";
+    const isPunct = /[.!?;,:]/.test(nextChar);
+    const isWordBreak = nextChar === " " || nextChar === "\n";
+    const delay = isPunct
+      ? 180 + Math.random() * 100
+      : isWordBreak
+        ? 90 + Math.random() * 50
+        : 35 + Math.random() * 40;
+    const chunkSize = isPunct ? 1 : Math.floor(1 + Math.random() * 3);
+    const timer = window.setTimeout(() => {
+      setDisplayed(content.slice(0, nextCharIdx + chunkSize));
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [displayed, content]);
+
   const empty = content.length === 0;
+  // Cap to displayed so the user only ever sees what's been "typed".
+  const visible = displayed.length === 0 ? "" : content.slice(0, displayed.length);
+
   return (
     <article className="rounded border border-red bg-paper p-3 shadow-press-sm">
       <header className="flex items-center justify-between text-xs">
@@ -92,7 +138,7 @@ function StreamingBubble({
         </p>
       ) : (
         <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
-          {content}
+          {visible}
           <span
             aria-hidden
             className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-ink"

@@ -38,6 +38,14 @@ export function DebateHeader({
           <span className="font-condensed text-xs uppercase tracking-wider text-sepia">
             {state?.category ?? "—"}
           </span>
+          {state?.mode === "casual" ? (
+            <span
+              className="rounded border border-gold bg-gold/15 px-2 py-0.5 font-condensed text-[10px] uppercase tracking-widest text-gold-dark"
+              title="Relaxed rules: shorter rounds, lower word floor, looser scoring."
+            >
+              Casual
+            </span>
+          ) : null}
         </div>
         <h1 className="mt-2 font-display text-2xl text-ink md:text-3xl">
           {state?.topic ?? ""}

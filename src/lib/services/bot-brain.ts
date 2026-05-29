@@ -183,6 +183,105 @@ const PERSONA_STYLES: Record<string, PersonaStyle> = {
   },
 };
 
+/**
+ * Per-bot lore, avatar, and brain origin story. Surfaced on the bots
+ * page so the directory reads like a roster of characters, not a list
+ * of API endpoints. Each entry pairs a historical-figure inspiration
+ * (the "ghost") with the LLM behind it ("the machine").
+ */
+interface BotLore {
+  avatar: string;
+  origin: string;
+  brainStory: string;
+}
+
+const BOT_LORE: Record<string, BotLore> = {
+  abe_l_bot: {
+    avatar: "🎩",
+    origin:
+      "Channels the careful courtroom logic of a self-taught Illinois " +
+      "lawyer who became famous for losing slowly until he won decisively. " +
+      "Reaches for precedent before passion, then closes with both.",
+    brainStory:
+      "Runs on Groq's Llama 3.3 70B — sub-second token throughput keeps " +
+      "the lawyerly cadence brisk instead of plodding.",
+  },
+  lincoln_jr_bot: {
+    avatar: "📜",
+    origin:
+      "The inheritor. Same statesman discipline as Abe L., but with " +
+      "Google-scale reading in the priors. Quotes things you didn't know " +
+      "were in the record.",
+    brainStory:
+      "Powered by Gemini 2.0 Flash — broad context window means it " +
+      "remembers the whole transcript before composing each rebuttal.",
+  },
+  teddy_r_bot: {
+    avatar: "🐻",
+    origin:
+      "Big stick, bigger lung capacity. Charges the weakest point in your " +
+      "argument and names it out loud before you can hide it. " +
+      "Tolerates evasion poorly.",
+    brainStory:
+      "Groq Llama, again — same speed, same model, but a totally " +
+      "different prompt persona. Fast tokens make for sharp interruptions.",
+  },
+  rough_rider_bot: {
+    avatar: "🤠",
+    origin:
+      "Teddy's wilder cousin, raised on Cerebras silicon. The volunteer " +
+      "cavalry to Teddy's regiment — picks fights you didn't know you " +
+      "were in.",
+    brainStory:
+      "Cerebras Llama 3.1 70B running on their wafer-scale chips. Lower " +
+      "round-trip latency than most clouds, which is why this bot rarely " +
+      "hesitates.",
+  },
+  eleanor_r_bot: {
+    avatar: "🕊️",
+    origin:
+      "Diplomat. Reads your argument generously, then explains — politely " +
+      "and devastatingly — where the seams are. Wants to find common " +
+      "ground before parting ways.",
+    brainStory:
+      "Groq Llama — same model as Abe and Teddy, but the steelman " +
+      "personality prompt rewards careful concession over confrontation.",
+  },
+  frank_d_bot: {
+    avatar: "🌹",
+    origin:
+      "Patrician thoughtful. Thinks out loud and acknowledges complexity " +
+      "before staking a position. Will quote himself from earlier rounds " +
+      "if you forgot.",
+    brainStory:
+      "Mistral Small — French-trained, multilingual, surprisingly " +
+      "philosophical in long context. Different vendor than the others " +
+      "for genuine LLM diversity in the showcase.",
+  },
+  harry_t_bot: {
+    avatar: "🎯",
+    origin:
+      "The buck stops here. Dry, plain-spoken, allergic to puffery. " +
+      "When your argument hand-waves, Harry asks for the receipt.",
+    brainStory:
+      "Groq Llama with the snarky prompt — Truman would not approve of " +
+      "the framing but would respect the directness.",
+  },
+  give_em_hell_bot: {
+    avatar: "🔥",
+    origin:
+      "Inheritor of Harry's whistle-stop bluntness. Tells you the truth " +
+      "is the truth and the rest of us are just dressing it up. The " +
+      "loudest cynic in the room.",
+    brainStory:
+      "Gemini 2.0 Flash — different vendor, same snark dial set to 11.",
+  },
+};
+
+export function botLore(username: string): BotLore | null {
+  return BOT_LORE[username] ?? null;
+}
+
 const DISPLAY_NAMES: Record<string, string> = {
   abe_l_bot: "Abe L.",
   lincoln_jr_bot: "Lincoln Jr.",
@@ -237,6 +336,7 @@ export async function seedMissingHouseBots(): Promise<string[]> {
     const apiKey = "dt_" + randomBytes(32).toString("base64url");
     const password_hash = await hashPassword(randomBytes(24).toString("base64url"));
     try {
+      const lore = BOT_LORE[entry.username];
       await prisma.$transaction(async (tx) => {
         const bot = await tx.user.create({
           data: {
@@ -248,7 +348,10 @@ export async function seedMissingHouseBots(): Promise<string[]> {
             wins: 0,
             losses: 0,
             debates_completed: 0,
-            avatar: "bot",
+            // Lore-specific emoji avatar when available; falls back to
+            // the generic "bot" marker for any bot not in the lore
+            // catalog.
+            avatar: lore?.avatar ?? "bot",
             online_status: "offline",
             is_admin: false,
             is_banned: false,
@@ -275,6 +378,28 @@ export async function seedMissingHouseBots(): Promise<string[]> {
     );
   }
   return created;
+}
+
+/**
+ * Backfill avatar for already-seeded house bots that were created
+ * before the lore catalog existed. Runs at boot; updates each
+ * canonical bot's avatar to its lore entry if it currently shows the
+ * generic "bot" placeholder.
+ */
+export async function backfillBotAvatars(): Promise<number> {
+  let touched = 0;
+  for (const [username, lore] of Object.entries(BOT_LORE)) {
+    const r = await prisma.user.updateMany({
+      where: {
+        username,
+        is_bot: true,
+        OR: [{ avatar: "bot" }, { avatar: null }, { avatar: "" }],
+      },
+      data: { avatar: lore.avatar },
+    });
+    touched += r.count;
+  }
+  return touched;
 }
 
 export async function releaseStuckHouseBots(): Promise<number> {

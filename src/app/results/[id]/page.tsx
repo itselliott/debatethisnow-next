@@ -116,10 +116,12 @@ export default async function ResultsPage({
       )}
 
       {result?.summary ? (
-        <section className="rounded border border-ink bg-paper-2 p-4 shadow-press">
-          <h2 className="mb-2 font-display text-lg">Verdict</h2>
-          <p className="text-sm leading-relaxed text-ink">{result.summary}</p>
-        </section>
+        // The LLM scorer returns summary in two parts joined by a
+        // blank line: a one-sentence headline VERDICT and a 4-6
+        // sentence ANALYSIS post-mortem. Render the headline in
+        // display type and the analysis as body text so the page
+        // reads like a real "what happened in this debate" recap.
+        <ImpartialAnalysis summary={result.summary} />
       ) : null}
 
       {breakdown.length > 0 ? (
@@ -188,6 +190,44 @@ export default async function ResultsPage({
         </Link>
       </div>
     </div>
+  );
+}
+
+/**
+ * Renders the LLM scorer's verdict + post-mortem. The summary string
+ * has the headline verdict on the first paragraph and the analysis
+ * (4-6 sentences) on the rest, joined by blank lines. We split, lay
+ * them out distinctly, and gracefully degrade to a single block when
+ * only one part is present (older results / fallback summarizer).
+ */
+function ImpartialAnalysis({ summary }: { summary: string }) {
+  const trimmed = summary.trim();
+  const parts = trimmed.split(/\n\s*\n/);
+  const headline = parts[0]?.trim() ?? "";
+  const analysis = parts.slice(1).join("\n\n").trim();
+  return (
+    <section className="rounded border-2 border-ink bg-paper-2 p-4 shadow-press">
+      <span className="font-condensed text-[11px] uppercase tracking-[0.28em] text-red">
+        Impartial Verdict
+      </span>
+      {headline ? (
+        <p className="mt-1 font-display text-lg leading-snug text-ink">
+          {headline}
+        </p>
+      ) : null}
+      {analysis ? (
+        <>
+          <div className="mt-3 border-t-2 border-dashed border-ink/30 pt-3">
+            <span className="font-condensed text-[10px] uppercase tracking-wider text-sepia">
+              Reasoning
+            </span>
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+            {analysis}
+          </p>
+        </>
+      ) : null}
+    </section>
   );
 }
 

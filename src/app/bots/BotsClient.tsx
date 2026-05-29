@@ -18,7 +18,9 @@ interface BotDir {
   elo_rating: number;
   online_status: string | null;
   bot_description: string | null;
+  avatar?: string | null;
   brain: { key: string; label: string; subtitle: string; vendor: string; color: string } | null;
+  lore?: { origin: string; brainStory: string } | null;
 }
 
 interface RegisterResponse {
@@ -162,30 +164,76 @@ export function BotsClient({
         <h2 className="mb-3 font-display text-lg">
           Bot Directory ({directory.length})
         </h2>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {directory.map((b) => (
             <li
               key={b.id}
-              className="rounded border border-ink bg-paper p-3 shadow-press-sm"
+              className="rounded border-2 border-ink bg-paper p-3 shadow-press-sm"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-display">{b.username}</span>
-                <span
-                  className={`rounded px-2 py-0.5 font-condensed text-[10px] uppercase tracking-wider ${
-                    b.online_status === "online"
-                      ? "bg-green-action text-paper"
-                      : b.online_status === "in_debate"
-                        ? "bg-gold-dark text-paper"
-                        : "bg-ink/30 text-paper"
-                  }`}
+              <div className="flex items-start gap-3">
+                {/* Bot avatar — emoji from BOT_LORE for canonical
+                    bots, falls back to a generic ⚙ for user-bots. */}
+                <div
+                  aria-hidden
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-ink bg-paper-2 text-2xl shadow-press-sm"
+                  style={{ borderColor: b.brain?.color }}
                 >
-                  {b.online_status ?? "offline"}
-                </span>
+                  {b.avatar && b.avatar !== "bot" ? b.avatar : "⚙"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-display text-base text-ink">
+                      {b.username}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded px-2 py-0.5 font-condensed text-[10px] uppercase tracking-wider ${
+                        b.online_status === "online"
+                          ? "bg-green-action text-paper"
+                          : b.online_status === "in_debate"
+                            ? "bg-gold-dark text-paper"
+                            : "bg-ink/30 text-paper"
+                      }`}
+                    >
+                      {b.online_status ?? "offline"}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-sepia">
+                    Elo {b.elo_rating}
+                    {b.brain ? (
+                      <>
+                        {" · "}
+                        <span
+                          className="font-condensed uppercase tracking-wider"
+                          style={{ color: b.brain.color }}
+                        >
+                          {b.brain.label}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-              <div className="mt-1 text-xs text-sepia">
-                Elo {b.elo_rating}
-                {b.brain ? ` · ${b.brain.label}` : ""}
-              </div>
+
+              {b.lore ? (
+                <div className="mt-3 space-y-2 border-t border-ink/15 pt-2">
+                  <div>
+                    <div className="font-condensed text-[10px] uppercase tracking-wider text-red">
+                      Origin
+                    </div>
+                    <p className="mt-0.5 text-xs leading-snug text-ink">
+                      {b.lore.origin}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="font-condensed text-[10px] uppercase tracking-wider text-red">
+                      Brain
+                    </div>
+                    <p className="mt-0.5 text-xs leading-snug text-ink">
+                      {b.lore.brainStory}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

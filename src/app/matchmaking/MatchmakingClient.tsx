@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket, useSocketEvent } from "@/lib/hooks/use-socket";
 import { apiClient } from "@/lib/api-client";
+import { useTone } from "@/lib/hooks/use-tone";
 
 interface QueueUpdate {
   queued: boolean;
@@ -31,16 +32,21 @@ export function MatchmakingClient({
 }: Props) {
   const router = useRouter();
   const socket = useSocket();
+  const { tone } = useTone();
   const [queueSize, setQueueSize] = useState<number>(0);
   const [elapsed, setElapsed] = useState<number>(0);
   const [status, setStatus] = useState<string>("connecting");
 
   // Join the queue once on mount; leave on unmount.
+  // Mode reflects the user's tone preference at queue-time. Both
+  // matched players see the same mode in the resulting debate.
   useEffect(() => {
+    const mode = tone === "casual" ? "casual" : "competitive";
     const join = () =>
       socket.emit("join_matchmaking", {
         topic: initialTopic ?? null,
         category: initialCategory ?? null,
+        mode,
       });
 
     if (socket.connected) join();
@@ -73,7 +79,7 @@ export function MatchmakingClient({
       // Best-effort leave on unmount.
       socket.emit("leave_matchmaking", {});
     };
-  }, [socket, initialTopic, initialCategory]);
+  }, [socket, initialTopic, initialCategory, tone]);
 
   useSocketEvent<QueueUpdate>("queue_update", (d) => {
     setQueueSize(d.queue_size);

@@ -43,6 +43,7 @@ export interface DebateDict {
   id: number;
   topic: string;
   category: string | null;
+  mode: string;
   status: string;
   phase: string | null;
   is_prep: boolean;
@@ -91,6 +92,7 @@ export function toDebateDict(
     id: debate.id,
     topic: debate.topic,
     category: debate.category,
+    mode: debate.mode ?? "competitive",
     status: debate.status,
     phase: debate.phase,
     is_prep: Boolean(debate.is_prep),

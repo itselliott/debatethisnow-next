@@ -11,6 +11,7 @@ import { toDebateDict } from "@/lib/serializers/debate";
 import { toUserAchievementDict } from "@/lib/serializers/achievement";
 import { getCurrentUser } from "@/lib/auth/server";
 import { ProfileChallengeButton } from "./ProfileChallengeButton";
+import { displayAvatar } from "@/lib/avatars";
 
 export const metadata = { title: "Profile · DebateThis" };
 
@@ -66,15 +67,23 @@ export default async function ProfilePage({
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b-[3px] border-double border-ink pb-4">
-        <div>
-          <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
-            {d.rank_tier}
-          </span>
-          <h1 className="mt-1 font-display text-3xl">{d.username}</h1>
-          <p className="text-sm text-sepia">
-            Elo <strong className="font-display text-ink">{d.elo_rating}</strong>{" "}
-            · {d.wins} W / {d.losses} L · {d.win_rate}%
-          </p>
+        <div className="flex items-start gap-4">
+          <div
+            aria-hidden
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded border-2 border-ink bg-paper text-3xl shadow-press-sm"
+          >
+            {displayAvatar(user.avatar, d.username)}
+          </div>
+          <div>
+            <span className="font-condensed text-xs uppercase tracking-[0.28em] text-red">
+              {d.rank_tier}
+            </span>
+            <h1 className="mt-1 font-display text-3xl">{d.username}</h1>
+            <p className="text-sm text-sepia">
+              Elo <strong className="font-display text-ink">{d.elo_rating}</strong>{" "}
+              · {d.wins} W / {d.losses} L · {d.win_rate}%
+            </p>
+          </div>
         </div>
         {canChallenge ? (
           <ProfileChallengeButton targetUsername={d.username} />

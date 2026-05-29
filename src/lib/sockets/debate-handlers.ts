@@ -12,12 +12,11 @@ import { env } from "@/lib/env";
 import {
   abandonShowcase,
   advanceTurn,
-  argumentCaps,
+  argumentRules,
   beginNextRoundShowcase,
   castVote,
   getUserVote,
   isShowcaseDebate,
-  MIN_ARGUMENT_WORDS,
   openVotingShowcase,
   startSpeakingNow,
   startTurn,
@@ -345,6 +344,7 @@ async function onSubmitArgument(
       is_prep: true,
       player1_id: true,
       player2_id: true,
+      mode: true,
     },
   });
   if (!d) {
@@ -364,20 +364,18 @@ async function onSubmitArgument(
     return;
   }
 
-  // Pre-checks for the most common rejection reasons (Python emits the
-  // same human-friendly messages here so the JS client can show the
-  // exact same toasts).
+  // Mode-aware caps. Casual debates use lower floors / ceilings.
+  const { minWords, maxWords, maxBytes } = argumentRules(d);
   const wc = countWords(content);
-  if (wc < MIN_ARGUMENT_WORDS) {
+  if (wc < minWords) {
     socket.emit("error", {
       message: "min_words",
-      min_words: MIN_ARGUMENT_WORDS,
+      min_words: minWords,
       your_words: wc,
-      human: `Need at least ${MIN_ARGUMENT_WORDS} words — you wrote ${wc}.`,
+      human: `Need at least ${minWords} words — you wrote ${wc}.`,
     });
     return;
   }
-  const { maxWords, maxBytes } = argumentCaps();
   if (wc > maxWords) {
     socket.emit("error", {
       message: "max_words",

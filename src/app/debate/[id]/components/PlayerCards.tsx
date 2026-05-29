@@ -2,6 +2,7 @@
 
 import { useStore } from "zustand";
 import type { DebateStore } from "@/lib/stores/debate-store";
+import { displayAvatar } from "@/lib/avatars";
 
 export function PlayerCards({
   store,
@@ -47,7 +48,7 @@ function PlayerCard({
   typing,
 }: {
   side: string;
-  player: { id: number; username: string; elo_rating: number; rank_tier: string | null } | null;
+  player: { id: number; username: string; elo_rating: number; rank_tier: string | null; avatar?: string | null } | null;
   votes: number;
   score: number;
   active: boolean;
@@ -60,11 +61,19 @@ function PlayerCard({
       className={`rounded border-2 ${active ? "border-red bg-paper-2" : "border-ink bg-paper-2"} p-3 shadow-press-sm`}
     >
       <div className="flex items-center gap-2">
-        {/* Side label + name + (you) all on one row — no more
-            full-width column of "FOR" stranded above the name. */}
+        {/* Side label + avatar + name + (you) all on one row. */}
         <span className="shrink-0 rounded bg-red/10 px-2 py-0.5 font-condensed text-[10px] uppercase tracking-widest text-red">
           {side}
         </span>
+        {player ? (
+          <span
+            aria-hidden
+            className="shrink-0 text-xl"
+            title={`${player.username}'s avatar`}
+          >
+            {displayAvatar(player.avatar ?? null, player.username)}
+          </span>
+        ) : null}
         <span className="min-w-0 flex-1 truncate font-display text-lg text-ink md:text-xl">
           {player?.username ?? "—"}
           {isMe ? (

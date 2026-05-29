@@ -31,11 +31,35 @@ export async function POST(
   }
   const c = await prisma.challenge.findUnique({ where: { id: cid } });
   if (!c || c.target_id !== resolved.user.id) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
+    return NextResponse.json(
+      {
+        error: "not_found",
+        message: "This challenge no longer exists.",
+      },
+      { status: 404 },
+    );
   }
   if (c.status !== "pending") {
+    // Surface a specific human-readable message so the client doesn't
+    // just show "HTTP 400" when the user clicks accept on a challenge
+    // that was already accepted / declined / expired.
+    const statusMessage =
+      c.status === "accepted"
+        ? c.debate_id
+          ? "This challenge was already accepted — the debate is in progress."
+          : "This challenge was already accepted."
+        : c.status === "declined"
+          ? "This challenge was already declined."
+          : c.status === "expired"
+            ? "This challenge has expired."
+            : `This challenge is no longer open (status: ${c.status}).`;
     return NextResponse.json(
-      { error: "already_resolved", status: c.status },
+      {
+        error: "already_resolved",
+        status: c.status,
+        debate_id: c.debate_id ?? null,
+        message: statusMessage,
+      },
       { status: 400 },
     );
   }
@@ -44,7 +68,13 @@ export async function POST(
       where: { id: c.id },
       data: { status: "expired" },
     });
-    return NextResponse.json({ error: "expired" }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "expired",
+        message: "This challenge expired before you could accept it.",
+      },
+      { status: 400 },
+    );
   }
   try {
     const debate = await prisma.$transaction(async (tx) => {

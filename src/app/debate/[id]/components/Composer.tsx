@@ -30,11 +30,12 @@ import { countWords } from "@/lib/utils/word-count";
 import { useLang, useTone } from "@/lib/hooks/use-tone";
 import { useVoiceInput } from "@/lib/hooks/use-voice-input";
 
-const MIN_WORDS = 15;
-// Mirrors server `env.MAX_ARGUMENT_WORDS` (default 800). The socket
-// handler rejects anything over this with a `max_words` error event;
-// pre-validating here disables submit before the user even tries.
-const MAX_WORDS = 800;
+// Default (competitive) caps. Casual mode is read from the debate
+// state and lowers both — derived in the component body.
+const MIN_WORDS_COMPETITIVE = 15;
+const MIN_WORDS_CASUAL = 10;
+const MAX_WORDS_COMPETITIVE = 800;
+const MAX_WORDS_CASUAL = 400;
 const TYPING_DEBOUNCE_MS = 800;
 const TYPING_INACTIVE_MS = 2500;
 
@@ -67,6 +68,11 @@ export function Composer({
   const isMyTurn = state?.current_turn_user_id === viewerId;
   const isParticipant =
     state?.player1?.id === viewerId || state?.player2?.id === viewerId;
+  // Mode-aware caps. Server enforces these too; we mirror them here
+  // so the user gets instant validation.
+  const isCasual = state?.mode === "casual";
+  const MIN_WORDS = isCasual ? MIN_WORDS_CASUAL : MIN_WORDS_COMPETITIVE;
+  const MAX_WORDS = isCasual ? MAX_WORDS_CASUAL : MAX_WORDS_COMPETITIVE;
 
   // Single, mount-stable error listener. Restores text on rejection so
   // the user can fix + retry.
