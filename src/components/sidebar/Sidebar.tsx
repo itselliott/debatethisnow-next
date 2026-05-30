@@ -23,7 +23,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { displayAvatar } from "@/lib/avatars";
 import { tierColor } from "@/lib/tiers";
-import { logoutAndRedirect } from "@/lib/auth/logout-client";
+import { useLogout } from "@/lib/auth/logout-client";
 
 interface NavLink {
   href: string;
@@ -310,9 +310,10 @@ function SoundToggleButton({ compact = false }: { compact?: boolean }) {
 
 function LogoutButton({ compact = false }: { compact?: boolean }) {
   const { t } = useTone();
+  const logout = useLogout();
   const handleLogout = useCallback(() => {
-    void logoutAndRedirect();
-  }, []);
+    void logout();
+  }, [logout]);
   return (
     <button
       type="button"

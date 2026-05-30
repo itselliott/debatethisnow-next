@@ -18,7 +18,7 @@ import { useTone } from "@/lib/hooks/use-tone";
 import type { PhraseKey } from "@/lib/tone/phrases";
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { useCurrentUser } from "@/lib/hooks/use-current-user";
-import { logoutAndRedirect } from "@/lib/auth/logout-client";
+import { useLogout } from "@/lib/auth/logout-client";
 
 interface Tab {
   href: string;
@@ -116,6 +116,7 @@ function MoreSheet({
   // a Log In link in the same slot instead.
   const me = useCurrentUser();
   const isAuthed = !!me.data;
+  const logout = useLogout();
   return (
     <div
       role="dialog"
@@ -168,7 +169,7 @@ function MoreSheet({
         {isAuthed ? (
           <button
             type="button"
-            onClick={() => void logoutAndRedirect()}
+            onClick={() => void logout()}
             className="mt-3 w-full rounded border-2 border-red bg-red/10 py-2 font-condensed text-xs uppercase tracking-widest text-red-dark"
           >
             <span aria-hidden className="mr-1">⏻</span>
